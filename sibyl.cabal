@@ -2,8 +2,6 @@ cabal-version:       2.2
 
 name:                sibyl
 version:             0.0.0.1
--- synopsis:
--- description:
 homepage:            https://github.com/jackiedorland/sibyl#readme
 license:             BSD-3-Clause
 license-file:        LICENSE
@@ -17,9 +15,18 @@ extra-source-files:  README.md
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Sibyl.TimeSeries
+  exposed-modules:     Sibyl
+                       Sibyl.Safe
+                       Sibyl.TimeSeries
                        Sibyl.Safe.TimeSeries
+                       Sibyl.Model
+                       Sibyl.Forecast
+                       Sibyl.Smoothing
+                       Sibyl.Decomposition
+                       Sibyl.Accuracy
+                       Sibyl.Plotting
   other-modules:       Sibyl.Internal.Util
+                       Sibyl.Models.ARIMA
   default-language:    Haskell2010
   build-depends:       base >= 4.7 && < 5,
                        vector >= 0.13,
@@ -34,7 +41,6 @@ library
                        -Wmissing-home-modules
                        -Wpartial-fields
                        -Wredundant-constraints
-                       -Wno-missing-export-lists
 
 source-repository head
   type:     git
@@ -44,7 +50,15 @@ test-suite sibyl-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
-  other-modules:       Sibyl.TimeSeriesSpec
+  other-modules:       Sibyl.AccuracySpec
+                       Sibyl.DecompositionSpec
+                       Sibyl.FacadeSpec
+                       Sibyl.ForecastSpec
+                       Sibyl.ModelSpec
+                       Sibyl.PlottingSpec
+                       Sibyl.SafeTimeSeriesSpec
+                       Sibyl.SmoothingSpec
+                       Sibyl.TimeSeriesSpec
   default-language:    Haskell2010
   build-depends:       base >= 4.7 && < 5,
                        sibyl,

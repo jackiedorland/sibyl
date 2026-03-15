@@ -1,4 +1,9 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 module Sibyl.Model where
+
+import qualified Data.Vector.Unboxed as U
+import Sibyl.Forecast (Forecast)
 
 data TrainingSummary t = TrainingSummary
     { length :: Int
@@ -6,11 +11,11 @@ data TrainingSummary t = TrainingSummary
     , end    :: t
     }
 
-data InformationCriteria = 
+data InformationCriteria = InformationCriteria
     { aic  :: Double -- AIC
-      aicc :: Double -- AICc
-      bic  :: Double -- BIC
-      hqic :: Double -- future: Hannan-Quinn?
+    , aicc :: Double -- AICc
+    , bic  :: Double -- BIC
+    , hqic :: Double -- future: Hannan-Quinn?
     } deriving (Show, Eq)
 
 data ModelSummary = ModelSummary 
@@ -23,9 +28,17 @@ data ModelSummary = ModelSummary
     ,    converged    :: Maybe Bool -- Nothing here means that convergence doesn't make any sense, like the naive model
     }
 
+data FitError
+    = InvalidModelSpec String
+    | InsufficientData String
+    | NumericalFailure String
+    deriving (Show, Eq)
+
 class SibylModel m t where 
     forecast     :: Int -> m t -> Forecast t
     residuals    :: m t -> U.Vector Double
-    fitted       :: 
+    fitted       :: m t -> U.Vector Double
+    summarize    :: m t -> IO ()
+    modelSummary :: m t -> ModelSummary
 
 

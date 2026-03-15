@@ -140,8 +140,6 @@ spec = do
       let shorter = takeFirst 4 sampleTs
       evaluate (zipWithSeries (+) sampleTs shorter) `shouldThrow` errorCall "zipWithSeries: LengthMismatch"
 
-    -- If you want strict index alignment checking, you may want to add an
-    -- IndexMismatch constructor to TimeSeriesError rather than reusing LengthMismatch.
     it "rejects series with same length but different indices" $ do
       let shiftedTs = sampleTs { index = U.fromList [10..17 :: Int] }
       evaluate (zipWithSeries (+) sampleTs shiftedTs) `shouldThrow` errorCall "zipWithSeries: IndexMismatch"

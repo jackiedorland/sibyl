@@ -18,5 +18,5 @@ data ARIMA t = ARIMA
     ,   residiuals       :: U.Vector Double
     ,   fitted           :: TimeSeries t Double
     ,   settings         :: ARIMASettings
-    ,   trainingSummary  :: TrainingSummary -- training data
+    ,   trainingSummary  :: TrainingSummary t -- training data
     }
