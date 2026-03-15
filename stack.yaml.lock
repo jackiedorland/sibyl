@@ -3,7 +3,28 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/topics/lock_files
 
-packages: []
+packages:
+- completed:
+    hackage: dataframe-0.7.0.0@sha256:06aa53b287ac5e1d7afa1f03e8ab08f410e3cc91057e41f28db1b449ab40912a,9859
+    pantry-tree:
+      sha256: acb677d8d0d3150b116063eae80cf88e162f08c895f644d6106c9b6932ca8fb8
+      size: 14231
+  original:
+    hackage: dataframe-0.7.0.0@sha256:06aa53b287ac5e1d7afa1f03e8ab08f410e3cc91057e41f28db1b449ab40912a,9859
+- completed:
+    hackage: granite-0.4.0.0@sha256:c31937620e57d68ac0645cddab6b5640a43481a8eb053f08fb0ec4ce87998a35,2101
+    pantry-tree:
+      sha256: 0926d9908bf07feee70b224fbe835c96b0dc941f9379b11ffe55d1b35ee13a69
+      size: 550
+  original:
+    hackage: granite-0.4.0.0@sha256:c31937620e57d68ac0645cddab6b5640a43481a8eb053f08fb0ec4ce87998a35,2101
+- completed:
+    hackage: snappy-hs-0.1.0.5@sha256:c2bdac6f5ac1bd8e935e18f43ecaefcbc2b6b2e919cfbc1ea04cac0799348958,1834
+    pantry-tree:
+      sha256: 82d8e11370a298be0adf865e5a2478de5a2ce3df6dc672ca0efc6a1aa0edee68
+      size: 364
+  original:
+    hackage: snappy-hs-0.1.0.5@sha256:c2bdac6f5ac1bd8e935e18f43ecaefcbc2b6b2e919cfbc1ea04cac0799348958,1834
 snapshots:
 - completed:
     sha256: a8cfaae441160430cdde558cb80d4f9d60746e7417b275250e4e0af57ee14f36

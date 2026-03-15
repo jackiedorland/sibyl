@@ -40,8 +40,10 @@ packages:
 # - git: https://github.com/commercialhaskell/stack.git
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
 #
-# extra-deps: []
-
+extra-deps:
+  - dataframe-0.7.0.0@sha256:06aa53b287ac5e1d7afa1f03e8ab08f410e3cc91057e41f28db1b449ab40912a,9859
+  - granite-0.4.0.0@sha256:c31937620e57d68ac0645cddab6b5640a43481a8eb053f08fb0ec4ce87998a35,2101
+  - snappy-hs-0.1.0.5@sha256:c2bdac6f5ac1bd8e935e18f43ecaefcbc2b6b2e919cfbc1ea04cac0799348958,1834
 # Override default flag values for project packages and extra-deps
 # flags: {}
 

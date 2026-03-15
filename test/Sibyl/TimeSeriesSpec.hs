@@ -1,9 +1,8 @@
 module Sibyl.TimeSeriesSpec (spec) where
 
+import Control.Exception (evaluate)
 import Test.Hspec
 import Test.QuickCheck
-import Data.Foldable (toList)
-import qualified Data.Vector as B
 import qualified Data.Vector.Unboxed as U
 import Sibyl.TimeSeries
 
@@ -15,25 +14,22 @@ infix 1 ???
 sampleTs :: TimeSeries Int Double
 sampleTs = sampleTimeSeries
 
-sampleBts :: BTimeSeries Int Double
-sampleBts = sampleBTimeSeries
-
 spec :: Spec
 spec = do
   describe "mkTimeSeries" $ do
     it "rejects length mismatch" $ do
       let index = U.fromList [1 :: Int, 2]
           values = U.fromList [10.0 :: Double]
-      mkTimeSeries index values Nothing Nothing ??? Left LengthMismatch
+      evaluate (mkTimeSeries index values) `shouldThrow` errorCall "mkTimeSeries: LengthMismatch"
 
     it "rejects empty series" $ do
       let index = U.empty :: U.Vector Int
           values = U.empty :: U.Vector Double
-      mkTimeSeries index values Nothing Nothing ??? Left EmptySeries
+      evaluate (mkTimeSeries index values) `shouldThrow` errorCall "mkTimeSeries: EmptySeries"
 
   describe "basic invariants" $ do
     it "sampleTimeSeries has aligned index/observation lengths" $ do
-      U.length (tsIndex sampleTs) ??? U.length (tsObservations sampleTs)
+      U.length (index sampleTs) ??? U.length (observations sampleTs)
 
     it "length equals input length for valid strictly increasing index" $
       property $ \xs ->
@@ -42,106 +38,47 @@ spec = do
             index = U.fromList indexList
             values = U.fromList valuesList
          in not (null indexList) ==>
-              case mkTimeSeries index values Nothing Nothing of
-                Left _ -> property False
-                Right ts -> tsLength ts === length indexList
-
-  describe "mkBTimeSeries" $ do
-    it "rejects length mismatch" $ do
-      let index = B.fromList [1 :: Int, 2]
-          values = B.fromList [10.0 :: Double]
-      mkBTimeSeries index values Nothing Nothing ??? Left LengthMismatch
-
-    it "rejects empty series" $ do
-      let index = B.empty :: B.Vector Int
-          values = B.empty :: B.Vector Double
-      mkBTimeSeries index values Nothing Nothing ??? Left EmptySeries
-
-    it "accepts a valid series shape from the sample time series" $ do
-      mkBTimeSeries (btsIndex sampleBts) (btsObservations sampleBts) (btsName sampleBts) (btsDescription sampleBts) ??? Right sampleBts
-
-  describe "BTimeSeries Functor" $ do
-    it "maps only observations" $ do
-      let mapped = fmap (+1) sampleBts
-       in do
-            btsIndex mapped ??? btsIndex sampleBts
-            btsObservations mapped ??? B.map (+ 1) (btsObservations sampleBts)
-
-    it "fmap id = id" $ do
-      fmap id sampleBts ??? sampleBts
-
-  describe "BTimeSeries Foldable" $ do
-    it "foldr sums observations" $ do
-      foldr (+) 0 sampleBts ??? 837.0
-
-    it "toList returns observation values" $ do
-      toList sampleBts ??? [101.0, 103.0, 102.5, 104.0, 106.0, 105.5, 107.0, 108.0 :: Double]
+              tsLength (mkTimeSeries index values) === length indexList
 
   describe "lag tests" $ do 
     it "lag by one period" $ do
-      case lag sampleTs 1 of
-        Left e -> expectationFailure ("unexpected lag error: " ++ show e)
-        Right lagged ->
-          lagged ??? sampleTs
-            { tsObservations = U.take (tsLength sampleTs - 1) (tsObservations sampleTs)
-            , tsIndex = U.drop 1 (tsIndex sampleTs)
-            }
+      let lagged = lag sampleTs 1
+      lagged ??? sampleTs
+        { observations = U.take (tsLength sampleTs - 1) (observations sampleTs)
+        , index = U.drop 1 (index sampleTs)
+        }
     
     it "rejects -1 lag" $ do
-      lag sampleTs (-1) ??? Left InvalidLag
+      evaluate (lag sampleTs (-1)) `shouldThrow` errorCall "lag: InvalidLag"
 
     it "rejects n lag" $ do
-      lag sampleTs (tsLength sampleTs) ??? Left InvalidLag
-
-  describe "lagB tests" $ do
-    it "lagB by one period" $ do
-      case lagB sampleBts 1 of
-        Left e -> expectationFailure ("unexpected lagB error: " ++ show e)
-        Right lagged ->
-          lagged ??? sampleBts
-            { btsObservations = B.take (btsLength sampleBts - 1) (btsObservations sampleBts)
-            , btsIndex = B.drop 1 (btsIndex sampleBts)
-            }
-
-    it "rejects -1 lagB" $ do
-      lagB sampleBts (-1) ??? Left InvalidLag
-
-    it "rejects n lagB" $ do
-      lagB sampleBts (btsLength sampleBts) ??? Left InvalidLag
+      evaluate (lag sampleTs (tsLength sampleTs)) `shouldThrow` errorCall "lag: InvalidLag"
 
   describe "lead tests" $ do
     it "lead by one period" $ do
-      case lead sampleTs 1 of
-        Left e -> expectationFailure ("unexpected lead error: " ++ show e)
-        Right led ->
-          led ??? sampleTs
-            { tsObservations = U.drop 1 (tsObservations sampleTs)
-            , tsIndex = U.take (tsLength sampleTs - 1) (tsIndex sampleTs)
-            }
+      let led = lead sampleTs 1
+      led ??? sampleTs
+        { observations = U.drop 1 (observations sampleTs)
+        , index = U.take (tsLength sampleTs - 1) (index sampleTs)
+        }
 
     it "rejects -1 lead" $ do
-      lead sampleTs (-1) ??? Left InvalidLead
+      evaluate (lead sampleTs (-1)) `shouldThrow` errorCall "lead: InvalidLead"
 
     it "rejects n lead" $ do
-      lead sampleTs (tsLength sampleTs) ??? Left InvalidLead
+      evaluate (lead sampleTs (tsLength sampleTs)) `shouldThrow` errorCall "lead: InvalidLead"
 
-  describe "leadB tests" $ do
-    it "leadB by one period" $ do
-      case leadB sampleBts 1 of
-        Left e -> expectationFailure ("unexpected leadB error: " ++ show e)
-        Right led ->
-          led ??? sampleBts
-            { btsObservations = B.drop 1 (btsObservations sampleBts)
-            , btsIndex = B.take (btsLength sampleBts - 1) (btsIndex sampleBts)
-            }
+  describe "diff tests" $ do
+    it "diff by one period" $ do
+      let differenced = diff sampleTs
+      index differenced ??? U.fromList [2, 3, 4, 5, 6, 7, 8]
+      observations differenced ??? U.fromList [2.0, -0.5, 1.5, 2.0, -0.5, 1.5, 1.0]
 
-    it "rejects -1 leadB" $ do
-      leadB sampleBts (-1) ??? Left InvalidLead
+    it "rejects singleton series" $ do
+      let singletonTs = mkTimeSeries (U.fromList [1 :: Int]) (U.fromList [101.0 :: Double])
+      evaluate (diff singletonTs) `shouldThrow` errorCall "diff: InsufficientObservations"
 
-    it "rejects n leadB" $ do
-      leadB sampleBts (btsLength sampleBts) ??? Left InvalidLead
-    
-  describe "length, start and end for (B)TimeSeries" $ do
+  describe "length, start and end for TimeSeries" $ do
     it "tsLength" $ do
       tsLength sampleTs ??? 8
 
@@ -151,15 +88,63 @@ spec = do
     it "tsEnd" $ do
       tsEnd sampleTs ??? 8
 
-    it "btsLength" $ do
-      btsLength sampleBts ??? 8
+  describe "takeFirst/takeLast/slice" $ do
+    it "slice returns correct subrange" $ do
+      let sts = slice 3 5 sampleTs
+      observations sts ??? U.fromList [102.5, 104.0, 106.0]
+      index sts ??? U.fromList [3, 4, 5]
 
-    it "btsStart" $ do
-      btsStart sampleBts ??? 1
+    it "slice rejects start > end" $ do
+      evaluate (slice 5 3 sampleTs) `shouldThrow` errorCall "slice: InvalidSlice"
 
-    it "btsEnd" $ do
-      btsEnd sampleBts ??? 8
+    it "slice rejects empty result" $ do
+      evaluate (slice 100 200 sampleTs) `shouldThrow` errorCall "slice: EmptySeries"
 
+    it "takeFirst returns first k elements" $ do
+      let sts = takeFirst 3 sampleTs
+      observations sts ??? U.fromList [101.0, 103.0, 102.5]
+      index sts ??? U.fromList [1, 2, 3]
+
+    it "takeFirst rejects negative k" $ do
+      evaluate (takeFirst (-1) sampleTs) `shouldThrow` errorCall "takeFirst: InvalidQuantity"
+
+    it "takeFirst rejects k > length" $ do
+      evaluate (takeFirst 9 sampleTs) `shouldThrow` errorCall "takeFirst: InvalidQuantity"
+
+    it "takeLast returns last k elements" $ do
+      let sts = takeLast 3 sampleTs
+      observations sts ??? U.fromList [105.5, 107.0, 108.0]
+      index sts ??? U.fromList [6, 7, 8]
+
+    it "takeLast rejects negative k" $ do
+      evaluate (takeLast (-1) sampleTs) `shouldThrow` errorCall "takeLast: InvalidQuantity"
+
+    it "takeLast rejects k > length" $ do
+      evaluate (takeLast 9 sampleTs) `shouldThrow` errorCall "takeLast: InvalidQuantity"
+
+  describe "zipWithSeries" $ do
+    it "adds two identical series element-wise" $ do
+      let zipped = zipWithSeries (+) sampleTs sampleTs
+      index zipped ??? index sampleTs
+      observations zipped ??? U.map (* 2) (observations sampleTs)
+
+    it "subtracts a series from itself gives all zeroes" $ do
+      let zipped = zipWithSeries (-) sampleTs sampleTs
+      observations zipped ??? U.replicate (tsLength sampleTs) 0.0
+
+    it "preserves the index from the input series" $ do
+      let zipped = zipWithSeries (*) sampleTs sampleTs
+      index zipped ??? index sampleTs
+
+    it "rejects series with different lengths" $ do
+      let shorter = takeFirst 4 sampleTs
+      evaluate (zipWithSeries (+) sampleTs shorter) `shouldThrow` errorCall "zipWithSeries: LengthMismatch"
+
+    -- If you want strict index alignment checking, you may want to add an
+    -- IndexMismatch constructor to TimeSeriesError rather than reusing LengthMismatch.
+    it "rejects series with same length but different indices" $ do
+      let shiftedTs = sampleTs { index = U.fromList [10..17 :: Int] }
+      evaluate (zipWithSeries (+) sampleTs shiftedTs) `shouldThrow` errorCall "zipWithSeries: IndexMismatch"
 
 uniqueSorted :: [Int] -> [Int]
 uniqueSorted = dedup . quicksort

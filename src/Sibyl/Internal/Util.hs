@@ -2,7 +2,6 @@
 module Sibyl.Internal.Util where
 
 import qualified Data.Vector.Unboxed as U
-import qualified Data.Vector as B
 
 type Text = String
 
@@ -11,7 +10,8 @@ strictlyIncreasing v
         | U.length v < 2 = True
         | otherwise      = U.and (U.zipWith (<) v (U.tail v))
 
-bStrictlyIncreasing :: (Ord a) => B.Vector a -> Bool
-bStrictlyIncreasing v
-        | B.length v < 2 = True
-        | otherwise      = B.and (B.zipWith (<) v (B.tail v))
+unsafeFromEither :: Show e => String -> Either e a -> a
+unsafeFromEither context result =
+  case result of
+    Left err -> error (context ++ ": " ++ show err)
+    Right value -> value

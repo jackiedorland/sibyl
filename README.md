@@ -11,14 +11,31 @@
                          ░░██████                 |、˜〵 
                           ░░░░░░                  じしˍ,)ノ 
 </pre>
+
+> *Tell us what the future holds, so we may know that you are gods.*
+
 ## A performant, R-style time series analysis library for Haskell.
 
 Sibyl is in extremely early development.
 
+What's it look like?
+```haskell
+import qualified DataFrame as D
+import qualified DataFrame.Functions as F
+import qualified Sibyl.Unsafe as S
+
+main :: IO ()
+main = do
+       ts <- TS.fromDataFrame $ D.readCsv "./dataset.csv" -- DataFrame -> TimeSeries
+       summarize $ runARIMA ts 
+       -- or:
+       plot $ runARIMA ts 
+```
+
 ### Core Infrastructure
-- [x] Unboxed and boxed time series types
-- [x] Safe constructors with invariant enforcement
-- [x] Explicit, pattern-matchable error types
+- [x] Unsafe timeseries for tools (`Sibyl.TimeSeries`)
+- [x] Safe timeseries for production pipelines (`Sibyl.Safe.TimeSeries`)
+- [x] Constructors with invariant enforcement (`error`)
 
 ### Transformations
 - [x] Lag and lead
