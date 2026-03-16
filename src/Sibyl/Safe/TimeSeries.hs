@@ -17,6 +17,8 @@ data TimeSeriesError
   | InvalidSlice
   | InvalidQuantity
   | InsufficientObservations
+  | InvalidPeriod
+  | InsufficientSeasons
   deriving (Show, Eq)
 
 -- * Unboxed Time Series
@@ -41,12 +43,12 @@ data TimeSeries t y = TimeSeries
   , observations :: !(U.Vector y)   -- ^ Values (observations) aligned 1:1 with 'index'
   } deriving (Eq, Show)
 
--- | A time series paired with optional metadata.
-data AnnotatedSeries t y = AnnotatedSeries
-  { series      :: !(TimeSeries t y)
-  , name        :: Maybe Text
-  , description :: Maybe Text
-  } deriving (Eq, Show)
+type Period = Int
+
+data SeasonalSeries t y = SeasonalSeries
+  { period       :: Period
+  , series       :: TimeSeries t y
+  }
 
 -- ** Construction
 
@@ -67,9 +69,33 @@ mkTimeSeries idx values
     ilen = U.length idx
     vlen = U.length values
 
--- | Attaches optional metadata to a raw series.
-annotateSeries :: TimeSeries t y -> Maybe Text -> Maybe Text -> AnnotatedSeries t y
-annotateSeries ts name desc = AnnotatedSeries ts name desc
+-- | Produces a `SeasonalSeries` from its inputs and enforces invariants. 
+-- 
+-- * 'index' and 'observations' have equal length
+-- * index must be strictly increasing (i.e. 1, 2, 3 and not 1, 1, 3)
+-- * series is non-empty
+-- * period must be >= 1 and @2 * period <= series length@
+-- 
+-- Requires `U.Unbox` constraints on index and observation element types.
+mkSeasonalSeries :: (Ord t, U.Unbox t, U.Unbox y) => U.Vector t -> U.Vector y -> Int -> Either TimeSeriesError (SeasonalSeries t y)
+mkSeasonalSeries idx values period
+  | period < 1 = Left InvalidPeriod
+  | otherwise  = do
+      ts <- mkTimeSeries idx values
+      if tsLength ts < 2 * period
+        then Left InsufficientSeasons
+        else Right (SeasonalSeries period ts)
+
+-- | Splits a 'SeasonalSeries' into full-season chunks. Trailing incomplete season is dropped.
+seasonSlices :: (U.Unbox t, U.Unbox y) => SeasonalSeries t y -> [TimeSeries t y]
+seasonSlices ss =
+  [ TimeSeries (U.slice (i * m) m idx) (U.slice (i * m) m obs)
+  | i <- [0 .. fullSeasons - 1] ]
+  where
+    m           = period ss
+    idx         = index (series ss)
+    obs         = observations (series ss)
+    fullSeasons = U.length obs `div` m
 
 -- ** Sample Data
 
@@ -147,7 +173,7 @@ slice start end ts
     newIndex = U.slice drops remaining timeIndex
     newObs = U.slice drops remaining obs
 
--- | Keeps the last @n@ observations.
+-- | Keeps the last @k@ observations.
 takeLast :: (U.Unbox t, U.Unbox y) => Int -> TimeSeries t y -> Either TimeSeriesError (TimeSeries t y)
 takeLast k ts
   | k < 0            = Left InvalidQuantity
@@ -161,7 +187,7 @@ takeLast k ts
     newIndex = U.drop (n - k) timeIndex
     newObs = U.drop (n - k) obs
 
--- | Keeps the first @n@ observations.
+-- | Keeps the first @k@ observations.
 takeFirst :: (U.Unbox t, U.Unbox y) => Int -> TimeSeries t y -> Either TimeSeriesError (TimeSeries t y)
 takeFirst k ts
   | k < 0            = Left InvalidQuantity
@@ -175,6 +201,7 @@ takeFirst k ts
     newIndex = U.take k timeIndex
     newObs = U.take k obs
 
+-- | Drops first @k@ observations.
 drop :: (U.Unbox t, U.Unbox y) => Int -> TimeSeries t y -> Either TimeSeriesError (TimeSeries t y)
 drop k ts
   | k < 0            = Left InvalidQuantity
@@ -187,12 +214,13 @@ drop k ts
     n = tsLength ts
     newIndex = U.drop k timeIndex
     newObs = U.drop k obs 
+
 -- ** Transformations
 
 -- | Shifts observations in a `TimeSeries` back by k.
 -- Output length is @n-k@; @k < 0@ or @k >= n@ results in `InvalidLag`
-lag :: (U.Unbox t, U.Unbox y) => TimeSeries t y -> Int -> Either TimeSeriesError (TimeSeries t y)
-lag ts k
+lag :: (U.Unbox t, U.Unbox y) => Int -> TimeSeries t y -> Either TimeSeriesError (TimeSeries t y)
+lag k ts
   | U.null timeIndex          = Left EmptySeries
   | k < 0                     = Left InvalidLag
   | k >= n                    = Left InvalidLag
@@ -207,8 +235,8 @@ lag ts k
 
 -- | Shifts observations in a `TimeSeries` forward by k.
 -- Output length is @n-k@; @k < 0@ or @k >= n@ results in `InvalidLead`
-lead :: (U.Unbox t, U.Unbox y) => TimeSeries t y -> Int -> Either TimeSeriesError (TimeSeries t y)
-lead ts k
+lead :: (U.Unbox t, U.Unbox y) => Int -> TimeSeries t y -> Either TimeSeriesError (TimeSeries t y)
+lead k ts
   | U.null timeIndex          = Left EmptySeries
   | k < 0                     = Left InvalidLead
   | k >= n                    = Left InvalidLead

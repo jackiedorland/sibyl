@@ -18,28 +18,61 @@
 
 Sibyl is in extremely early development.
 
-What's it look like?
+What will it look like?
+
+For statisticians (it's prettier than R):
 ```haskell
 import qualified DataFrame as D
-import qualified DataFrame.Functions as F
-import qualified Sibyl.Unsafe as S
+import Sibyl
 
 main :: IO ()
 main = do
-       ts <- TS.fromDataFrame $ D.readCsv "./dataset.csv" -- DataFrame -> TimeSeries
-       summarize $ runARIMA ts 
-       -- or:
-       plot $ runARIMA ts 
+  series   <- fromDataFrame (D.readCsv "./dataset.csv")
+  model    <- fitARIMA defaultARIMASettings series
+  summarize model
+  autoplot $ forecast 12 model
+```
+
+For developers and those who need safe error handling:
+```haskell
+import qualified DataFrame as D
+import qualified Data.Vector.Unboxed as U
+import qualified Sibyl.Safe.TimeSeries as TS
+import qualified Sibyl.Models.ARIMA as ARIMA
+import qualified Sibyl.Model as M
+
+main :: IO ()
+main = do
+  raw <- D.readCsv "./dataset.csv"
+
+  -- an example:
+  case TS.mkTimeSeries (extractIndex raw) (extractValues raw) of
+    Left tsErr -> do
+      logError ("failed! " ++ show tsErr)
+      fail ":("
+
+    Right series -> do
+      fitResult <- ARIMA.fitARIMA ARIMA.defaultARIMASettings series
+      case fitResult of
+        Left fitErr -> logError ("fit failure! " ++ show fitErr)
+        Right model -> do
+          let fc = M.forecast 12 model
+              summary = M.modelSummary model
+          writeJson "./artifacts/model-summary.json" summary
+          writeJson "./artifacts/forecast.json" fc
+
+-- writeJson, extractIndex, extractValues, etc...
 ```
 
 ### Core Infrastructure
 - [x] Unsafe timeseries for tools (`Sibyl.TimeSeries`)
 - [x] Safe timeseries for production pipelines (`Sibyl.Safe.TimeSeries`)
-- [x] Constructors with invariant enforcement (`error`)
+- [x] Seasonal timeseries implementation (safe & unsafe)
+- [x] Constructors with invariant enforcement
 
 ### Transformations
-- [x] Lag and lead
-- [ ] Differencing and integration
+- [x] Lag and lead on `TimeSeries`
+- [x] Series differencing 
 - [ ] Rolling / sliding window operations
 - [ ] Seasonal adjustments
 
@@ -69,7 +102,8 @@ main = do
 - [ ] Automatic ETS selection
 
 ### Evaluation & Diagnostics
-- [ ] Forecast accuracy metrics (MAE, RMSE, MAPE, MASE)
+- [x] Forecast accuracy metrics (MAE, RMSE, MAPE, MASE)
+- [ ] Bias & coverage
 - [ ] Residual diagnostics (ACF, Ljung-Box)
 - [ ] Cross-validation (time series CV / rolling origin)
 - [ ] Information criteria (AIC, AICc, BIC)

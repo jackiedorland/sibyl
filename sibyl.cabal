@@ -16,7 +16,6 @@ extra-source-files:  README.md
 library
   hs-source-dirs:      src
   exposed-modules:     Sibyl
-                       Sibyl.Safe
                        Sibyl.TimeSeries
                        Sibyl.Safe.TimeSeries
                        Sibyl.Model

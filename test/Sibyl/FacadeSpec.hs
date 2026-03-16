@@ -1,7 +1,7 @@
 module Sibyl.FacadeSpec (spec) where
 
 import qualified Sibyl as S
-import qualified Sibyl.Safe as Safe
+import qualified Sibyl.TimeSeries as TS
 import Test.Hspec
 
 spec :: Spec
@@ -17,8 +17,8 @@ spec = do
           _forecastList = []
       length _forecastList `shouldBe` 0
 
-    it "safe gives me timeseries constructors and transforms" $ do
-      Safe.tsLength Safe.sampleTimeSeries `shouldBe` 8
+    it "prod style direct module import works" $ do
+      TS.tsLength TS.sampleTimeSeries `shouldBe` 8
 
     it "fit entrypoints are still stubs" $ do
-      pendingWith "wire fitarima fitets fitnaive after internals are real then swap this for behavior tests"
+      pendingWith "wire fitARIMA fitETS fitNaive after internals are real then swap this for behavior tests"

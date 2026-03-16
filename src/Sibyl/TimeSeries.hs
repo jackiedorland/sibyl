@@ -1,11 +1,11 @@
 module Sibyl.TimeSeries
   ( -- * Types
     TimeSeries(..)
-  , AnnotatedSeries(..)
+  , SeasonalSeries(..) 
   , TimeSeriesError(..)
     -- * Construction
   , mkTimeSeries
-  , annotateSeries
+  , mkSeasonalSeries
   , defaultTimeSeries
   , sampleTimeSeries
     -- * Accessors
@@ -17,6 +17,7 @@ module Sibyl.TimeSeries
   , slice
   , takeLast
   , takeFirst
+  , drop
     -- * Transformations
   , mapObservations
   , mapWithIndex
@@ -25,22 +26,25 @@ module Sibyl.TimeSeries
   , diff
   ) where
 
-import qualified Data.Vector.Unboxed as U
+import Sibyl.Internal.Util
+import qualified Sibyl.Safe.TimeSeries as Safe
 import Sibyl.Safe.TimeSeries
-  ( AnnotatedSeries(..)
-  , TimeSeries(..)
+  ( TimeSeries(..)
+  , SeasonalSeries(..)
   , TimeSeriesError(..)
-  , annotateSeries
   , defaultTimeSeries
   , mapObservations
   , mapWithIndex
+  , mkSeasonalSeries
   , sampleTimeSeries
+  , seasonSlices
   , tsEnd
   , tsLength
   , tsStart
   )
-import qualified Sibyl.Safe.TimeSeries as Safe
-import Sibyl.Internal.Util
+
+import qualified Data.Vector.Unboxed as U  
+import Prelude hiding (drop)
 
 -- | Produces a `TimeSeries` from its inputs and enforces invariants.
 --
@@ -51,7 +55,6 @@ import Sibyl.Internal.Util
 -- Requires `U.Unbox` constraints on index and observation element types.
 mkTimeSeries :: (Ord t, U.Unbox t, U.Unbox y) => U.Vector t -> U.Vector y -> TimeSeries t y
 mkTimeSeries idx values = unsafeFromEither "mkTimeSeries" (Safe.mkTimeSeries idx values)
-
 
 -- | Combines two time series point-wise with a binary function.
 zipWithSeries :: (Eq t, U.Unbox a, U.Unbox b, U.Unbox c, U.Unbox t) => (a -> b -> c) -> TimeSeries t a -> TimeSeries t b -> TimeSeries t c
@@ -69,19 +72,22 @@ takeLast k ts = unsafeFromEither "takeLast" (Safe.takeLast k ts)
 takeFirst :: (U.Unbox t, U.Unbox y) => Int -> TimeSeries t y -> TimeSeries t y
 takeFirst k ts = unsafeFromEither "takeFirst" (Safe.takeFirst k ts)
 
-
 -- | Shifts observations in a `TimeSeries` back by k.
 -- Output length is @n-k@; @k < 0@ or @k >= n@ results in `InvalidLag`
-lag :: (U.Unbox t, U.Unbox y) => TimeSeries t y -> Int -> TimeSeries t y
-lag ts k = unsafeFromEither "lag" (Safe.lag ts k)
+lag :: (U.Unbox t, U.Unbox y) => Int -> TimeSeries t y -> TimeSeries t y
+lag k ts = unsafeFromEither "lag" (Safe.lag k ts)
 
 -- | Shifts observations in a `TimeSeries` forward by k.
 -- Output length is @n-k@; @k < 0@ or @k >= n@ results in `InvalidLead`
-lead :: (U.Unbox t, U.Unbox y) => TimeSeries t y -> Int -> TimeSeries t y
-lead ts k = unsafeFromEither "lead" (Safe.lead ts k)
+lead :: (U.Unbox t, U.Unbox y) => Int -> TimeSeries t y -> TimeSeries t y
+lead k ts = unsafeFromEither "lead" (Safe.lead k ts)
 
 -- | Differences consecutive observations in a `TimeSeries`.
 -- This function will drop the first value in the `TimeSeries` index.
 -- @n == 1@ results in InsufficientObservations
 diff :: (Num y, U.Unbox t, U.Unbox y) => TimeSeries t y -> TimeSeries t y
 diff ts = unsafeFromEither "diff" (Safe.diff ts)
+
+-- | Drops first @k@ observations.
+drop :: (U.Unbox t, U.Unbox y) => Int -> TimeSeries t y -> TimeSeries t y
+drop k ts = unsafeFromEither "drop" (Safe.drop k ts)

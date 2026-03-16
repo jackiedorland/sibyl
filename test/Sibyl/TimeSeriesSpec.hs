@@ -42,31 +42,31 @@ spec = do
 
   describe "lag tests" $ do 
     it "lag by one period" $ do
-      let lagged = lag sampleTs 1
+      let lagged = lag 1 sampleTs
       lagged ??? sampleTs
         { observations = U.take (tsLength sampleTs - 1) (observations sampleTs)
         , index = U.drop 1 (index sampleTs)
         }
     
     it "rejects -1 lag" $ do
-      evaluate (lag sampleTs (-1)) `shouldThrow` errorCall "lag: InvalidLag"
+      evaluate (lag (-1) sampleTs) `shouldThrow` errorCall "lag: InvalidLag"
 
     it "rejects n lag" $ do
-      evaluate (lag sampleTs (tsLength sampleTs)) `shouldThrow` errorCall "lag: InvalidLag"
+      evaluate (lag (tsLength sampleTs) sampleTs) `shouldThrow` errorCall "lag: InvalidLag"
 
   describe "lead tests" $ do
     it "lead by one period" $ do
-      let led = lead sampleTs 1
+      let led = lead 1 sampleTs
       led ??? sampleTs
         { observations = U.drop 1 (observations sampleTs)
         , index = U.take (tsLength sampleTs - 1) (index sampleTs)
         }
 
     it "rejects -1 lead" $ do
-      evaluate (lead sampleTs (-1)) `shouldThrow` errorCall "lead: InvalidLead"
+      evaluate (lead (-1) sampleTs) `shouldThrow` errorCall "lead: InvalidLead"
 
     it "rejects n lead" $ do
-      evaluate (lead sampleTs (tsLength sampleTs)) `shouldThrow` errorCall "lead: InvalidLead"
+      evaluate (lead (tsLength sampleTs) sampleTs) `shouldThrow` errorCall "lead: InvalidLead"
 
   describe "diff tests" $ do
     it "diff by one period" $ do

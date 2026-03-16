@@ -7,7 +7,7 @@ import Sibyl.Model (SibylModel(..), ModelSummary, FitError, TrainingSummary)
 data ARIMASettings = ARIMASettings 
     { maxP :: Int
     , maxQ :: Int
-    , maxD :: Int -- THIS IS INCOMPLETE; FOR PLANNING ONLY   
+    , maxD :: Int -- incomplete, for planning only
     }
 
 defaultARIMA :: ARIMASettings

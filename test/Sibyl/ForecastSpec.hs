@@ -19,6 +19,7 @@ spec = do
             , upper = upperTs
             , level = 0.95
             , residuals = U.fromList [0.1, -0.2, 0.05]
+            , actuals   = U.fromList []
             }
       TS.tsLength (point fr) `shouldBe` 3
       level fr `shouldBe` 0.95
@@ -27,5 +28,5 @@ spec = do
       let idx = U.fromList [1 :: Int]
           one = TS.mkTimeSeries idx (U.fromList [10.0 :: Double])
           asForecast :: Forecast Int
-          asForecast = ForecastResult one one one 0.8 (U.fromList [0.0])
+          asForecast = ForecastResult one one one 0.8 (U.fromList [0.0]) (U.fromList [])
       level asForecast `shouldBe` 0.8

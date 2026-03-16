@@ -9,6 +9,7 @@ data ForecastResult t = ForecastResult
   , upper     :: TimeSeries t Double -- upper bound at frLevel
   , level     :: Double              -- e.g. 0.95
   , residuals :: U.Vector Double     -- in-sample residuals from training
+  , actuals   :: U.Vector Double     -- 
   }
 
 type Forecast t = ForecastResult t
