@@ -71,16 +71,6 @@ main = do
 -- writeJson, extractIndex, extractValues, etc...
 ```
 
-## Sibyl vs. R
-
-A few examples of R's weirdness:
-
-| R | Sibyl |
-|---|-------|
-| `diff(x)` returns a plain vector — time index is lost | `diff ts` returns `Either TimeSeriesError (TimeSeries t y)` with index preserved |
-| `ts(c(1,2,3), frequency=12)` silently creates a nonsensical monthly series with 3 observations | `mkSeasonalSeries idx values 12` returns `Left InsufficientSeasons` |
-| `cbind(a, b)` on mismatched series silently fills with `NA` | `zipWithSeries f tsA tsB` returns `Left IndexMismatch` |
-
 ### Core Infrastructure
 - [x] Unsafe timeseries for tools (`Sibyl.TimeSeries`)
 - [x] Safe timeseries for production pipelines (`Sibyl.Safe.TimeSeries`)
