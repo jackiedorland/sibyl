@@ -31,7 +31,7 @@ defaultARIMA = undefined
 
 data ARIMA t = ARIMA 
     {   coefficients     :: U.Vector Double
-    ,   residiuals       :: U.Vector Double
+    ,   residuals       :: U.Vector Double
     ,   fitted           :: TimeSeries t Double
     ,   settings         :: ARIMASettings
     ,   trainingSummary  :: TrainingSummary t -- training data
