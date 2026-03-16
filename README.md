@@ -18,9 +18,13 @@
 
 Sibyl is in extremely early development.
 
-What will it look like?
+R lets you do time series fast. It also lets you shoot yourself in the foot *really* fast. The urge to delete RStudio is all-encompassing every time I open it. 
 
-For statisticians (it's prettier than R):
+Sibyl is a statistical library made for people who agree that statisticians deserve better.
+
+So, what will it look like?
+
+*For statisticians (it's prettier than R):*
 ```haskell
 import qualified DataFrame as D
 import Sibyl
@@ -33,7 +37,7 @@ main = do
   autoplot $ forecast 12 model
 ```
 
-For developers and those who need safe error handling:
+*For developers and those who need safe error handling:*
 ```haskell
 import qualified DataFrame as D
 import qualified Data.Vector.Unboxed as U
