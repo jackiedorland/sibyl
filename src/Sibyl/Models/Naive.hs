@@ -9,7 +9,7 @@ import Sibyl.Forecast (Forecast(..), point, lower, upper, actuals)
 import Sibyl.Safe.TimeSeries (TimeSeries, Period, observations, tsEnd, tsStart)
 import Sibyl.TimeSeries (mkTimeSeries)
 
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, fromMaybe)
 import Data.Either (fromRight)
 import qualified Sibyl.Accuracy as Acc
 import qualified Data.Vector.Unboxed as U
@@ -212,9 +212,9 @@ naiveModelSummary naive = ModelSummary
         innerSeries = naiveSeries naive
         obs         = observations innerSeries
         n           = U.length obs
-        m           = fromJust $ period (settings naive)
+        m           = fromMaybe 1 (period (settings naive))
         residuals   = naiveResiduals naive
-        naiveScale  = Acc.mae $ U.zipWith (-) (U.drop 1 obs) (U.take (n-1) obs)
+        naiveScale  = Acc.mae $ U.zipWith (-) (U.drop m obs) (U.take (n-m) obs)
         actuals     = case method of
             Last     -> U.drop 1 obs
             Mean     -> obs
