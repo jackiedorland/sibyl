@@ -2,6 +2,7 @@ module Main (main) where
 
 import Test.Hspec
 import qualified Sibyl.AccuracySpec as AccuracySpec
+import qualified Sibyl.NaiveSpec as NaiveSpec
 import qualified Sibyl.DecompositionSpec as DecompositionSpec
 import qualified Sibyl.FacadeSpec as FacadeSpec
 import qualified Sibyl.ForecastSpec as ForecastSpec
@@ -19,6 +20,7 @@ main = hspec $ do
   describe "forecast" ForecastSpec.spec
   describe "model" ModelSpec.spec
   describe "accuracy" AccuracySpec.spec
+  describe "naive" NaiveSpec.spec
   describe "smoothing" SmoothingSpec.spec
   describe "decomposition" DecompositionSpec.spec
   describe "plotting" PlottingSpec.spec

@@ -3,17 +3,16 @@ module Sibyl.AccuracySpec (spec) where
 import Test.Hspec
 import qualified Data.Vector.Unboxed as U
 import Sibyl.Accuracy
-import Sibyl.Forecast
+import Sibyl.Forecast (Forecast(..), ForecastResult, point, lower, upper, ciLevel, residuals, actuals)
 import Sibyl.TimeSeries (sampleTimeSeries)
 import Sibyl.Safe.TimeSeries (SeasonalSeries(..), mkSeasonalSeries)
 
--- Minimal ForecastResult fixture — point/lower/upper are placeholders
 mkFc :: U.Vector Double -> U.Vector Double -> Forecast Int
-mkFc res acts = ForecastResult
+mkFc res acts = Forecast
   { point     = sampleTimeSeries
   , lower     = sampleTimeSeries
   , upper     = sampleTimeSeries
-  , level     = 0.95
+  , ciLevel   = 0.95
   , residuals = res
   , actuals   = acts
   }
@@ -39,15 +38,12 @@ spec = describe "accuracy metrics" $ do
 
   describe "mape" $ do
     it "computes mean absolute percentage error" $
-      mape (mkFc (U.fromList [10, 20]) (U.fromList [100, 200])) `shouldBe` Right 0.1
+      mape (mkFc (U.fromList [10, 20]) (U.fromList [100, 200])) `shouldBe` Right 10.0
     it "returns ZeroInActuals when any actual is 0" $
       mape (mkFc (U.fromList [1]) (U.fromList [0])) `shouldBe` Left ZeroInActuals
 
   describe "mase" $ do
     it "computes mase of 1.0 when forecast matches naive baseline" $ do
-      -- training: [10,20,30,40,12,22,32,42], period 4
-      -- naive diffs: |12-10|=2, |22-20|=2, |32-30|=2, |42-40|=2 → naiveDenom = 8/4 = 2.0
-      -- forecast residuals: [2,2,2,2] → mae = 2.0 → MASE = 2.0/2.0 = 1.0
       let ss = mkSS [1..8] [10,20,30,40,12,22,32,42] 4
           fc = mkFc (U.fromList [2, 2, 2, 2]) (U.fromList [])
       mase fc ss `shouldBe` Right 1.0

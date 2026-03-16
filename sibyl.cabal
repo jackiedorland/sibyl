@@ -24,6 +24,7 @@ library
                        Sibyl.Decomposition
                        Sibyl.Accuracy
                        Sibyl.Plotting
+                       Sibyl.Models.Naive
   other-modules:       Sibyl.Internal.Util
                        Sibyl.Models.ARIMA
   default-language:    Haskell2010
@@ -54,6 +55,7 @@ test-suite sibyl-test
                        Sibyl.FacadeSpec
                        Sibyl.ForecastSpec
                        Sibyl.ModelSpec
+                       Sibyl.NaiveSpec
                        Sibyl.PlottingSpec
                        Sibyl.SafeTimeSeriesSpec
                        Sibyl.SmoothingSpec

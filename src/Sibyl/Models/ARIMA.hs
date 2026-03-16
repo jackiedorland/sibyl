@@ -2,12 +2,18 @@ module Sibyl.Models.ARIMA where
 
 import qualified Data.Vector.Unboxed as U
 import Sibyl.Safe.TimeSeries (TimeSeries)
-import Sibyl.Model (SibylModel(..), ModelSummary, FitError, TrainingSummary)
+import Sibyl.Model (SibylModel(..), ModelSummary, FitError)
 
 data ARIMASettings = ARIMASettings 
     { maxP :: Int
     , maxQ :: Int
     , maxD :: Int -- incomplete, for planning only
+    }
+
+data TrainingSummary t = TrainingSummary
+    { length :: Int
+    , start  :: t
+    , end    :: t
     }
 
 defaultARIMA :: ARIMASettings

@@ -5,12 +5,6 @@ module Sibyl.Model where
 import qualified Data.Vector.Unboxed as U
 import Sibyl.Forecast (Forecast)
 
-data TrainingSummary t = TrainingSummary
-    { length :: Int
-    , start  :: t
-    , end    :: t
-    }
-
 data InformationCriteria = InformationCriteria
     { aic  :: Double -- AIC
     , aicc :: Double -- AICc

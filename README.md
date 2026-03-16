@@ -16,28 +16,31 @@
 
 ## A performant, R-style time series analysis library for Haskell.
 
-Sibyl is in extremely early development.
+##### BE AWARE: Sibyl is in extremely early development. Many features are unimplemented or defined as `undefined`.
 
-R lets you do time series fast. It also lets you shoot yourself in the foot *really* fast. The urge to delete RStudio is all-encompassing every time I open it. 
+### Why Sibyl?
 
-Sibyl is a statistical library made for people who agree that statisticians deserve better.
+R lets you do analysis fast. It also lets you shoot yourself in the foot *really* fast. Sibyl is a statistical library made for people who agree that statisticians and developers deserve better than R's jank
+
+Sibyl is split into two layers, one for developers, and one for statisticians in notebooks like [Jupyter](https://jupyter.org) or [Sabela](https://github.com/DataHaskell/sabela). `import Sibyl` gives you the notebook-friendly layer: functions that throw on failure rather than returning `Either`. For production pipelines,  you can import individual modules like `Sibyl.Safe.TimeSeries` or `Sibyl.Accuracy` directly to get full error handling. Both layers can be used together in the same file.
 
 So, what will it look like?
 
-*For statisticians (it's prettier than R):*
+##### For statisticians:
 ```haskell
 import qualified DataFrame as D
 import Sibyl
 
 main :: IO ()
 main = do
+  -- you can also do this in GHCi or the DataFrame REPL!
   series   <- fromDataFrame (D.readCsv "./dataset.csv")
   model    <- fitARIMA defaultARIMASettings series
   summarize model
   autoplot $ forecast 12 model
 ```
 
-*For developers and those who need safe error handling:*
+##### For developers and those who need safe error handling:
 ```haskell
 import qualified DataFrame as D
 import qualified Data.Vector.Unboxed as U
@@ -49,7 +52,7 @@ main :: IO ()
 main = do
   raw <- D.readCsv "./dataset.csv"
 
-  -- an example:
+  -- an example, with error handling:
   case TS.mkTimeSeries (extractIndex raw) (extractValues raw) of
     Left tsErr -> do
       logError ("failed! " ++ show tsErr)
@@ -67,6 +70,16 @@ main = do
 
 -- writeJson, extractIndex, extractValues, etc...
 ```
+
+## Sibyl vs. R
+
+A few examples of R's weirdness:
+
+| R | Sibyl |
+|---|-------|
+| `diff(x)` returns a plain vector — time index is lost | `diff ts` returns `Either TimeSeriesError (TimeSeries t y)` with index preserved |
+| `ts(c(1,2,3), frequency=12)` silently creates a nonsensical monthly series with 3 observations | `mkSeasonalSeries idx values 12` returns `Left InsufficientSeasons` |
+| `cbind(a, b)` on mismatched series silently fills with `NA` | `zipWithSeries f tsA tsB` returns `Left IndexMismatch` |
 
 ### Core Infrastructure
 - [x] Unsafe timeseries for tools (`Sibyl.TimeSeries`)
