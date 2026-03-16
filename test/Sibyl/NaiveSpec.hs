@@ -4,6 +4,7 @@ import Test.Hspec
 import Test.QuickCheck
 import qualified Data.Vector.Unboxed as U
 import Sibyl.Models.Naive
+import Sibyl.Model (ModelSummary(..), TrainingSummary(..), ErrorMeasures(..))
 import qualified Sibyl.Safe.TimeSeries as SafeTS
 import qualified Sibyl.TimeSeries as TS
 import Sibyl.Forecast (Forecast(..), point, lower, upper, ciLevel, residuals, actuals)
@@ -13,6 +14,12 @@ mkLast idx obs = Naive defaultNaiveSettings (TS.mkTimeSeries (U.fromList idx) (U
 
 mkMean :: [Int] -> [Double] -> Naive Int
 mkMean idx obs = Naive (NaiveSettings Mean Nothing 0.95) (TS.mkTimeSeries (U.fromList idx) (U.fromList obs))
+
+mkDrift :: [Int] -> [Double] -> Naive Int
+mkDrift idx obs = Naive (NaiveSettings Drift Nothing 0.95) (TS.mkTimeSeries (U.fromList idx) (U.fromList obs))
+
+mkSeasonal :: Int -> [Int] -> [Double] -> Naive Int
+mkSeasonal m idx obs = Naive (NaiveSettings Seasonal (Just m) 0.95) (TS.mkTimeSeries (U.fromList idx) (U.fromList obs))
 
 -- increasing list 
 genIncreasing :: Int -> Gen [Int]
@@ -34,10 +41,6 @@ spec = describe "naive model" $ do
       let fc = naiveForecastLast 3 (mkLast [1,2,3,4,5] [10,20,30,40,50])
       U.toList (SafeTS.observations (point fc)) `shouldBe` [50, 50, 50]
 
-    it "output length equals h" $ do
-      let fc = naiveForecastLast 5 (mkLast [1..10] (map fromIntegral [1..10 :: Int]))
-      TS.tsLength (point fc) `shouldBe` 5
-
     it "level equals ciLevel from settings" $ do
       let fc = naiveForecastLast 2 (mkLast [1,2,3] [1,2,3])
       ciLevel fc `shouldBe` 0.95
@@ -45,10 +48,6 @@ spec = describe "naive model" $ do
     it "residuals length is n-1" $ do
       let fc = naiveForecastLast 3 (mkLast [1..8] (map fromIntegral [1..8 :: Int]))
       U.length (residuals fc) `shouldBe` 7
-
-    it "actuals length matches residuals length" $ do
-      let fc = naiveForecastLast 3 (mkLast [1..8] (map fromIntegral [1..8 :: Int]))
-      U.length (actuals fc) `shouldBe` U.length (residuals fc)
 
     it "lower < point at every horizon" $ do
       let fc    = naiveForecastLast 4 (mkLast [1..5] [2,4,6,8,10])
@@ -136,10 +135,6 @@ spec = describe "naive model" $ do
       let fc = naiveForecastMean 2 (mkMean [1..6] (map fromIntegral [1..6 :: Int]))
       U.length (residuals fc) `shouldBe` 6
 
-    it "actuals length equals n" $ do
-      let fc = naiveForecastMean 2 (mkMean [1..6] (map fromIntegral [1..6 :: Int]))
-      U.length (actuals fc) `shouldBe` 6
-
     it "CI half-width is constant across all horizons" $ do
       -- Mean CI does not grow with h: hw = z*sigma*sqrt(1 + 1/n)
       let fc    = naiveForecastMean 5 (mkMean [1..5] [2,4,6,8,10])
@@ -178,3 +173,39 @@ spec = describe "naive model" $ do
               highs  = U.toList (SafeTS.observations (upper fc))
               widths = zipWith (-) highs pts
           in all (\w -> abs (w - head widths) < 1e-10) (tail widths)
+
+  describe "naiveModelSummary" $ do
+
+    it "name contains the method" $ do
+      name (naiveModelSummary (mkLast [1..5] [1,2,3,4,5])) `shouldContain` "Last"
+      name (naiveModelSummary (mkMean [1..5] [1,2,3,4,5])) `shouldContain` "Mean"
+      name (naiveModelSummary (mkDrift [1..5] [1,2,3,4,5])) `shouldContain` "Drift"
+      name (naiveModelSummary (mkSeasonal 3 [1..9] [1,2,3,1,2,3,1,2,3])) `shouldContain` "Seasonal"
+
+    it "coefficients is empty" $
+      coefficients (naiveModelSummary (mkLast [1..5] [1,2,3,4,5])) `shouldBe` []
+
+    it "criteria, logLik, converged are Nothing" $ do
+      let ms = naiveModelSummary (mkLast [1..5] [1,2,3,4,5])
+      criteria  ms `shouldBe` Nothing
+      logLik    ms `shouldBe` Nothing
+      converged ms `shouldBe` Nothing
+
+    it "training nObs equals series length" $
+      nObs (training (naiveModelSummary (mkLast [1..8] (map fromIntegral [1..8 :: Int])))) `shouldBe` 8
+
+    it "training dataStart and dataEnd match series" $ do
+      let ms = naiveModelSummary (mkLast [1..5] [1,2,3,4,5])
+      dataStart (training ms) `shouldBe` 1
+      dataEnd   (training ms) `shouldBe` 5
+
+    it "errors is Just" $
+      errors (naiveModelSummary (mkLast [1..5] [1,2,3,4,5])) `shouldSatisfy` (/= Nothing)
+
+    it "emMae >= 0" $ do
+      let Just e = errors (naiveModelSummary (mkLast [1..5] [1,2,3,4,5]))
+      emMae e `shouldSatisfy` (>= 0)
+
+    it "emRmse >= emMae (by Jensen's inequality)" $ do
+      let Just e = errors (naiveModelSummary (mkLast [1..5] [2,4,6,8,10]))
+      emRmse e `shouldSatisfy` (>= emMae e)

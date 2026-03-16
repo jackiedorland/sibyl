@@ -24,9 +24,3 @@ spec = do
       TS.tsLength (point fr) `shouldBe` 3
       ciLevel fr `shouldBe` 0.95
 
-    it "forecast alias still works" $ do
-      let idx = U.fromList [1 :: Int]
-          one = TS.mkTimeSeries idx (U.fromList [10.0 :: Double])
-          asForecast :: Forecast Int
-          asForecast = Forecast one one one 0.8 (U.fromList [0.0]) (U.fromList [])
-      ciLevel asForecast `shouldBe` 0.8

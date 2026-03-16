@@ -6,10 +6,12 @@ module Sibyl.Models.Naive where
 
 import Sibyl.Model
 import Sibyl.Forecast (Forecast(..), point, lower, upper, actuals)
-import Sibyl.Safe.TimeSeries (TimeSeries, Period, observations, tsEnd)
+import Sibyl.Safe.TimeSeries (TimeSeries, Period, observations, tsEnd, tsStart)
 import Sibyl.TimeSeries (mkTimeSeries)
 
 import Data.Maybe (fromJust)
+import Data.Either (fromRight)
+import qualified Sibyl.Accuracy as Acc
 import qualified Data.Vector.Unboxed as U
 import qualified Statistics.Sample as Sm
 import Statistics.Distribution (quantile)
@@ -168,11 +170,53 @@ naiveInSampleResiduals naive = case naiveMethod (settings naive) of
 naiveResiduals :: (U.Unbox t) => Naive t -> U.Vector Double
 naiveResiduals = naiveInSampleResiduals
 
-naiveFitted :: Naive t -> U.Vector Double
-naiveFitted = undefined
+naiveFitted :: U.Unbox t => Naive t -> U.Vector Double
+naiveFitted naive = U.zipWith (-) actuals (naiveInSampleResiduals naive)
+  where
+    obs     = observations (naiveSeries naive)
+    n       = U.length obs
+    m       = fromJust $ period (settings naive)
+    actuals = case naiveMethod (settings naive) of
+      Last     -> U.drop 1 obs
+      Mean     -> obs
+      Drift    -> U.drop 1 obs
+      Seasonal -> U.drop m obs
 
-naiveSummarize :: Naive t -> IO ()
-naiveSummarize = undefined
+naiveSummarize :: U.Unbox t => Naive t -> IO ()
+naiveSummarize naive = print $ show $ naiveModelSummary naive
 
-naiveModelSummary :: Naive t -> ModelSummary t
-naiveModelSummary = undefined
+naiveModelSummary :: U.Unbox t => Naive t -> ModelSummary t
+naiveModelSummary naive = ModelSummary
+    { name         = "Naive model" ++ "(" ++ show method ++ ")"
+    , coefficients = []
+    , criteria     = Nothing
+    , logLik       = Nothing
+    , converged    = Nothing
+    , errors       = Just ErrorMeasures
+                    { emMe   = Sm.mean residuals
+                    , emRmse = Acc.rmse residuals
+                    , emMae  = Acc.mae  residuals
+                    , emMape = fromRight (0/0) $ Acc.mape residuals actuals
+                    , emMase = fromRight (0/0) $ Acc.mase residuals naiveScale
+                    }
+    , training     = TrainingSummary
+                    { dataStart  = tsStart innerSeries
+                    , dataEnd    = tsEnd innerSeries
+                    , nObs       = n
+                    , sigma2     = Sm.varianceUnbiased residuals
+                    , naiveScale = naiveScale
+                    }
+    }
+    where
+        method      = naiveMethod (settings naive)
+        innerSeries = naiveSeries naive
+        obs         = observations innerSeries
+        n           = U.length obs
+        m           = fromJust $ period (settings naive)
+        residuals   = naiveResiduals naive
+        naiveScale  = Acc.mae $ U.zipWith (-) (U.drop 1 obs) (U.take (n-1) obs)
+        actuals     = case method of
+            Last     -> U.drop 1 obs
+            Mean     -> obs
+            Drift    -> U.drop 1 obs
+            Seasonal -> U.drop m obs

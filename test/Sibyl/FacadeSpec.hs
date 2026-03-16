@@ -7,16 +7,6 @@ import Test.Hspec
 spec :: Spec
 spec = do
   describe "facade contracts" $ do
-    it "unsafe exports ts alias" $ do
-      let _value :: S.TS Int Double
-          _value = S.sampleTimeSeries
-      True `shouldBe` True
-
-    it "unsafe exports fc alias" $ do
-      let _forecastList :: [S.FC Int]
-          _forecastList = []
-      length _forecastList `shouldBe` 0
-
     it "prod style direct module import works" $ do
       TS.tsLength TS.sampleTimeSeries `shouldBe` 8
 

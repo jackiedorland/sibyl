@@ -15,15 +15,15 @@ spec = do
       M.InvalidModelSpec "x" `shouldBe` M.InvalidModelSpec "x"
 
     it "modelsummary payload shape is usable" $ do
-      let ms =
-            M.ModelSummary
-              { M.name = "ARIMA(1,1,1)"
+      let ts = M.TrainingSummary { M.dataStart = (1 :: Int), M.dataEnd = 100, M.nObs = 100, M.sigma2 = 1.2, M.naiveScale = 0.5 }
+          ms = M.ModelSummary
+              { M.name         = "ARIMA(1,1,1)"
               , M.coefficients = [("ar1", 0.4, 0.1)]
-              , M.criteria = Nothing
-              , M.sigma2 = 1.2
-              , M.logLik = Nothing
-              , M.nObs = 100
-              , M.converged = Just True
+              , M.criteria     = Nothing
+              , M.logLik       = Nothing
+              , M.converged    = Just True
+              , M.errors       = Nothing
+              , M.training     = ts
               }
       M.name ms `shouldBe` "ARIMA(1,1,1)"
-      M.nObs ms `shouldBe` 100
+      M.nObs (M.training ms) `shouldBe` 100
