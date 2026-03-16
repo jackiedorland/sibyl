@@ -2,7 +2,7 @@ module Sibyl
   ( module Sibyl.TimeSeries
   , module Sibyl.Model
   , module Sibyl.Forecast
-  , mae, rmse, mape, mase
+  , mae, rmse, mape, mase, maseFromModel
   , AccuracyError(..)
   , fitARIMA
   , fitETS
@@ -15,7 +15,7 @@ import Sibyl.TimeSeries hiding (name)
 import Sibyl.Model
 import Sibyl.Forecast
 import qualified Sibyl.Accuracy as Accuracy
-import Sibyl.Accuracy (mae, rmse, AccuracyError(..))
+import Sibyl.Accuracy (mae, rmse, maseFromModel, AccuracyError(..))
 import Sibyl.Internal.Util (unsafeFromEither)
 import qualified Data.Vector.Unboxed as U
 import qualified Sibyl.Models.ARIMA as ARIMA
@@ -23,13 +23,11 @@ import qualified Sibyl.Models.ARIMA as ARIMA
 type TS t y = TimeSeries t y
 type FC t = Forecast t
 
-mape :: Forecast t -> Double
-mape = unsafeFromEither "mape" . Accuracy.mape
+mape :: U.Vector Double -> U.Vector Double -> Double
+mape resids acts = unsafeFromEither "mape" (Accuracy.mape resids acts)
 
-mase :: U.Unbox t => Forecast t -> SeasonalSeries t Double -> Double
-mase fc ss = unsafeFromEither "mase" (Accuracy.mase fc ss)
-
-
+mase :: U.Vector Double -> Double -> Double
+mase resids naiveScale = unsafeFromEither "mase" (Accuracy.mase resids naiveScale)
 
 fitARIMA :: ARIMA.ARIMASettings -> TimeSeries t Double -> IO (ARIMA.ARIMA t)
 fitARIMA = undefined 

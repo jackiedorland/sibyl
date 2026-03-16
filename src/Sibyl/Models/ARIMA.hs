@@ -2,18 +2,28 @@ module Sibyl.Models.ARIMA where
 
 import qualified Data.Vector.Unboxed as U
 import Sibyl.Safe.TimeSeries (TimeSeries)
-import Sibyl.Model (SibylModel(..), ModelSummary, FitError)
+import Sibyl.Model (SibylModel(..), ModelSummary, FitError, TrainingSummary)
 
-data ARIMASettings = ARIMASettings 
-    { maxP :: Int
-    , maxQ :: Int
-    , maxD :: Int -- incomplete, for planning only
-    }
+data IC = AIC | AICc | BIC deriving (Show, Eq)
 
-data TrainingSummary t = TrainingSummary
-    { length :: Int
-    , start  :: t
-    , end    :: t
+data EstimationMethod = CSS | ML | CSSML deriving (Show, Eq)
+
+data ARIMAOrder
+    = Manual { p :: Int, d :: Int, q :: Int
+             , bigP :: Int, bigD :: Int, bigQ :: Int }
+    | Auto   { maxP :: Int, maxQ :: Int, maxD :: Int
+             , maxBigP :: Int, maxBigQ :: Int, maxBigD :: Int
+             , maxOrder :: Int }
+
+data ARIMASettings = ARIMASettings
+    { order      :: ARIMAOrder
+    , period     :: Maybe Int
+    , ic         :: IC
+    , allowMean  :: Bool
+    , allowDrift :: Bool
+    , method     :: EstimationMethod  -- CSS | ML | CSSML
+    , stepwise   :: Bool
+    , lambda     :: Maybe Double
     }
 
 defaultARIMA :: ARIMASettings

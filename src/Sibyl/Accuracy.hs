@@ -1,36 +1,33 @@
 module Sibyl.Accuracy
-  ( mae, rmse, mape, mase
+  ( mae, rmse, mape, mase, maseFromModel
   , AccuracyError(..)
   ) where
 
-import Sibyl.Forecast
-import Sibyl.Safe.TimeSeries (SeasonalSeries(..), TimeSeries(..), tsLength)
 import qualified Data.Vector.Unboxed as U
 import Statistics.Sample as Sm
+import Sibyl.Model (SibylModel(..), naiveScale, training, modelSummary)
 
-data AccuracyError 
+data AccuracyError
     = ZeroInActuals
     | ConstantTraining
     deriving (Show, Eq)
 
-mae :: Forecast t -> Double
-mae fc = Sm.mean $ U.map abs (residuals fc)
+mae :: U.Vector Double -> Double
+mae resids = Sm.mean $ U.map abs resids
 
-rmse :: Forecast t -> Double
-rmse fc = sqrt $ Sm.mean $ U.map (^2) (residuals fc)
+rmse :: U.Vector Double -> Double
+rmse resids = sqrt $ Sm.mean $ U.map (^2) resids
 
-mape :: Forecast t -> Either AccuracyError Double
-mape fc 
-    | U.any (== 0) (actuals fc)    = Left ZeroInActuals
-    | otherwise                    = fmap (*100) $ Right $ Sm.mean $ U.zipWith (\r a -> abs r / abs a) (residuals fc) (actuals fc)
+-- | actuals = fitted + residuals; pass both to avoid recomputing
+mape :: U.Vector Double -> U.Vector Double -> Either AccuracyError Double
+mape resids acts
+    | U.any (== 0) acts = Left ZeroInActuals
+    | otherwise         = Right $ (*100) $ Sm.mean $ U.zipWith (\r a -> abs r / abs a) resids acts
 
-mase :: U.Unbox t => Forecast t -> SeasonalSeries t Double -> Either AccuracyError Double
-mase fc ss
-    | naiveMae == 0  = Left ConstantTraining
-    | otherwise      = Right $ mae fc / (naiveMae / fromIntegral (n - m))
-    where
-        rawSeries = series ss
-        n = tsLength rawSeries
-        obs = observations rawSeries
-        naiveMae = U.sum $ U.zipWith (\yt ytm -> abs (yt - ytm)) (U.drop m obs) obs
-        m = period ss
+mase :: U.Vector Double -> Double -> Either AccuracyError Double
+mase resids scale
+    | scale == 0 = Left ConstantTraining
+    | otherwise  = Right $ mae resids / scale
+
+maseFromModel :: (SibylModel m t, U.Unbox t) => m t -> Either AccuracyError Double
+maseFromModel m = mase (residuals m) (naiveScale (training (modelSummary m)))
