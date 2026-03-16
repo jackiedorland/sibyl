@@ -183,7 +183,7 @@ naiveFitted naive = U.zipWith (-) actuals (naiveInSampleResiduals naive)
       Seasonal -> U.drop m obs
 
 naiveSummarize :: U.Unbox t => Naive t -> IO ()
-naiveSummarize naive = print $ show $ naiveModelSummary naive
+naiveSummarize naive = print $ naiveModelSummary naive
 
 naiveModelSummary :: U.Unbox t => Naive t -> ModelSummary t
 naiveModelSummary naive = ModelSummary
