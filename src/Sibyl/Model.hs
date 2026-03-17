@@ -5,26 +5,42 @@ module Sibyl.Model where
 import qualified Data.Vector.Unboxed as U
 import Sibyl.Forecast (Forecast)
 
-class SibylModel m t where 
-    forecast     :: Int -> m t -> Forecast t
+data IC = AIC | AICc | BIC deriving (Show, Eq)
+
+-- this kinda sucks, maybe hmatrix is better? not sure
+data RegressorMatrix = RegressorMatrix
+    { regressorNames :: [String]
+    , regressorData  :: U.Vector Double
+    , regressorRows  :: Int
+    , regressorCols  :: Int
+    } deriving (Show, Eq)
+
+class Model m t where
     residuals    :: m t -> U.Vector Double
     fitted       :: m t -> U.Vector Double
-    summarize    :: m t -> IO ()
     modelSummary :: m t -> ModelSummary t
+    summarize    :: m t -> IO ()
+    summarize    =  print . modelSummary
+
+class Model m t => Forecastable m t where
+    forecast :: Int -> m t -> Forecast t
+
+class Model m t => ForecastableWith r m t where
+    forecastWith :: Int -> r -> m t -> Forecast t
 
 data TrainingSummary t = TrainingSummary
     { dataStart  :: t
     , dataEnd    :: t
-    , nObs       :: Int    
-    , sigma2     :: Double 
-    , naiveScale :: Double 
+    , nObs       :: Int
+    , sigma2     :: Double
+    , naiveScale :: Double
     } deriving (Show, Eq)
 
 data InformationCriteria = InformationCriteria
     { aic  :: Double -- AIC
     , aicc :: Double -- AICc
     , bic  :: Double -- BIC
-    , hqic :: Double -- future: Hannan-Quinn, maybe
+    , hqic :: Double -- Hannan-Quinn (future use)
     } deriving (Show, Eq)
 
 data ErrorMeasures = ErrorMeasures
@@ -36,8 +52,8 @@ data ErrorMeasures = ErrorMeasures
     } deriving (Show, Eq)
 
 data ModelSummary t = ModelSummary
-    { name         :: String                        -- e.g. ARIMA(1,1,1)
-    , coefficients :: [(String, Double, Double)]    -- e.g. [("ar1", 0.42, 0.09), ("ma1", -0.31, 0.11)]
+    { name         :: String                      -- e.g. "ARIMA(1,1,1)"
+    , coefficients :: [(String, Double, Double)]  -- (name, estimate, std error)
     , criteria     :: Maybe InformationCriteria
     , logLik       :: Maybe Double
     , converged    :: Maybe Bool
@@ -82,7 +98,5 @@ instance Show (ModelSummary t) where
 data FitError
     = InvalidModelSpec String
     | InsufficientData String
-    | NumericalFailure String
+    | NumericalFailure  String
     deriving (Show, Eq)
-
-

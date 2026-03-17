@@ -12,4 +12,8 @@ data Forecast t = Forecast
   , actuals   :: U.Vector Double     -- actuals from training
   }
 
-type ForecastResult t = Forecast t
+data ForecastError
+    = InvalidHorizon    String   -- e.g. h <= 0
+    | InsufficientHistory String -- series too short for requested horizon
+    | RegressorMismatch String   -- column count or name mismatch (X variants)
+    deriving (Show, Eq)

@@ -4,7 +4,7 @@
 
 module Sibyl.Models.Naive where
 
-import Sibyl.Model
+import Sibyl.Model (Model(..), Forecastable(..), ModelSummary(..), FitError(..), TrainingSummary(..), ErrorMeasures(..), InformationCriteria(..))
 import Sibyl.Forecast (Forecast(..), point, lower, upper, actuals)
 import Sibyl.Safe.TimeSeries (TimeSeries, Period, observations, tsEnd, tsStart, tsLength)
 import Sibyl.TimeSeries (mkTimeSeries)
@@ -39,8 +39,11 @@ data Naive t = Naive
     , naiveSeries :: TimeSeries t Double
     }
 
-fitNaive :: U.Unbox t => NaiveSettings -> TimeSeries t Double -> Either FitError (Naive t)
-fitNaive cfg ts
+fitNaive :: U.Unbox t => TimeSeries t Double -> Either FitError (Naive t)
+fitNaive = fitNaiveWith defaultNaiveSettings
+
+fitNaiveWith :: U.Unbox t => NaiveSettings -> TimeSeries t Double -> Either FitError (Naive t)
+fitNaiveWith cfg ts
     | n < 2     = Left (InsufficientData "Need at least 2 observations for naive forecast")
     | naiveMethod cfg == Seasonal = case period cfg of
         Nothing -> Left (InvalidModelSpec "Seasonal method requires a period (not Nothing)")
@@ -51,13 +54,14 @@ fitNaive cfg ts
     | otherwise = Right (Naive cfg ts)
     where
         n = tsLength ts
-    
-instance (Ord t, Enum t, U.Unbox t) => SibylModel Naive t where
-    forecast     = naiveForecast
+
+instance (Ord t, Enum t, U.Unbox t) => Model Naive t where
     residuals    = naiveResiduals
     fitted       = naiveFitted
-    summarize    = naiveSummarize
     modelSummary = naiveModelSummary
+
+instance (Ord t, Enum t, U.Unbox t) => Forecastable Naive t where
+    forecast = naiveForecast
 
 naiveForecast :: (Ord t, Enum t, U.Unbox t) => Int -> Naive t -> Forecast t
 naiveForecast h naive = case naiveMethod (settings naive) of
@@ -165,7 +169,7 @@ naiveForecastSeasonal h naive = Forecast
         pointVals   = U.generate h (\k -> obs U.! (n - m + (k `mod` m)))
         halfWidths  = U.generate h (\k -> z * sigma * sqrt (fromIntegral (k `div` m + 1)))
 
-naiveInSampleResiduals :: (U.Unbox t) => Naive t -> U.Vector Double
+naiveInSampleResiduals :: Naive t -> U.Vector Double
 naiveInSampleResiduals naive = case naiveMethod (settings naive) of
         Last     -> U.zipWith (-) (U.drop 1 obs) (U.take (n-1) obs)
         Mean     -> U.map (subtract $ Sm.mean obs) obs
@@ -177,10 +181,10 @@ naiveInSampleResiduals naive = case naiveMethod (settings naive) of
         n     = U.length obs
         m     = fromJust $ period (settings naive)
 
-naiveResiduals :: (U.Unbox t) => Naive t -> U.Vector Double
+naiveResiduals :: Naive t -> U.Vector Double
 naiveResiduals = naiveInSampleResiduals
 
-naiveFitted :: U.Unbox t => Naive t -> U.Vector Double
+naiveFitted :: Naive t -> U.Vector Double
 naiveFitted naive = U.zipWith (-) actuals (naiveInSampleResiduals naive)
   where
     obs     = observations (naiveSeries naive)
@@ -191,9 +195,6 @@ naiveFitted naive = U.zipWith (-) actuals (naiveInSampleResiduals naive)
       Mean     -> obs
       Drift    -> U.drop 1 obs
       Seasonal -> U.drop m obs
-
-naiveSummarize :: U.Unbox t => Naive t -> IO ()
-naiveSummarize naive = print $ naiveModelSummary naive
 
 naiveModelSummary :: U.Unbox t => Naive t -> ModelSummary t
 naiveModelSummary naive = ModelSummary
