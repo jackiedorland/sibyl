@@ -1,11 +1,9 @@
 module Sibyl.TimeSeries
   ( -- * Types
     TimeSeries(..)
-  , SeasonalSeries(..) 
   , TimeSeriesError(..)
     -- * Construction
   , mkTimeSeries
-  , mkSeasonalSeries
   , defaultTimeSeries
   , sampleTimeSeries
     -- * Accessors
@@ -30,12 +28,10 @@ import Sibyl.Internal.Util
 import qualified Sibyl.Safe.TimeSeries as Safe
 import Sibyl.Safe.TimeSeries
   ( TimeSeries(..)
-  , SeasonalSeries(..)
   , TimeSeriesError(..)
   , defaultTimeSeries
   , mapObservations
   , mapWithIndex
-  , mkSeasonalSeries
   , sampleTimeSeries
   , seasonSlices
   , tsEnd

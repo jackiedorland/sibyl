@@ -20,11 +20,11 @@
 
 ### Why Sibyl?
 
-R lets you do analysis fast. It also lets you shoot yourself in the foot *really* fast. Sibyl is a statistical library made for people who agree that statisticians and developers deserve better than R's jank
+R lets you do analysis fast. It also lets you shoot yourself in the foot fast. Sibyl is a statistical library made for people who agree that statisticians and developers deserve better!
 
 Sibyl is split into two layers, one for developers, and one for statisticians in notebooks like [Jupyter](https://jupyter.org) or [Sabela](https://github.com/DataHaskell/sabela). `import Sibyl` gives you the notebook-friendly layer: functions that throw on failure rather than returning `Either`. For production pipelines,  you can import individual modules like `Sibyl.Safe.TimeSeries` or `Sibyl.Accuracy` directly to get full error handling. Both layers can be used together in the same file.
 
-So, what will it look like?
+So, what will it look like (eventually)?
 
 ##### For statisticians:
 ```haskell
@@ -74,7 +74,6 @@ main = do
 ### Core Infrastructure
 - [x] Unsafe timeseries for tools (`Sibyl.TimeSeries`)
 - [x] Safe timeseries for production pipelines (`Sibyl.Safe.TimeSeries`)
-- [x] Seasonal timeseries implementation (safe & unsafe)
 - [x] Constructors with invariant enforcement
 
 ### Transformations

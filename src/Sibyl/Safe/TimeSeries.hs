@@ -17,8 +17,6 @@ data TimeSeriesError
   | InvalidSlice
   | InvalidQuantity
   | InsufficientObservations
-  | InvalidPeriod
-  | InsufficientSeasons
   deriving (Show, Eq)
 
 -- * Unboxed Time Series
@@ -45,11 +43,6 @@ data TimeSeries t y = TimeSeries
 
 type Period = Int
 
-data SeasonalSeries t y = SeasonalSeries
-  { period       :: Period
-  , series       :: TimeSeries t y
-  }
-
 -- ** Construction
 
 -- | Produces a `TimeSeries` from its inputs and enforces invariants. 
@@ -69,32 +62,14 @@ mkTimeSeries idx values
     ilen = U.length idx
     vlen = U.length values
 
--- | Produces a `SeasonalSeries` from its inputs and enforces invariants. 
--- 
--- * 'index' and 'observations' have equal length
--- * index must be strictly increasing (i.e. 1, 2, 3 and not 1, 1, 3)
--- * series is non-empty
--- * period must be >= 1 and @2 * period <= series length@
--- 
--- Requires `U.Unbox` constraints on index and observation element types.
-mkSeasonalSeries :: (Ord t, U.Unbox t, U.Unbox y) => U.Vector t -> U.Vector y -> Int -> Either TimeSeriesError (SeasonalSeries t y)
-mkSeasonalSeries idx values period
-  | period < 1 = Left InvalidPeriod
-  | otherwise  = do
-      ts <- mkTimeSeries idx values
-      if tsLength ts < 2 * period
-        then Left InsufficientSeasons
-        else Right (SeasonalSeries period ts)
-
 -- | Splits a 'SeasonalSeries' into full-season chunks. Trailing incomplete season is dropped.
-seasonSlices :: (U.Unbox t, U.Unbox y) => SeasonalSeries t y -> [TimeSeries t y]
-seasonSlices ss =
+seasonSlices :: (U.Unbox t, U.Unbox y) => Int -> TimeSeries t y -> [TimeSeries t y]
+seasonSlices m ss =
   [ TimeSeries (U.slice (i * m) m idx) (U.slice (i * m) m obs)
   | i <- [0 .. fullSeasons - 1] ]
   where
-    m           = period ss
-    idx         = index (series ss)
-    obs         = observations (series ss)
+    idx         = index ss
+    obs         = observations ss
     fullSeasons = U.length obs `div` m
 
 -- ** Sample Data

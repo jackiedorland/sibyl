@@ -6,7 +6,7 @@ module Sibyl.Models.Naive where
 
 import Sibyl.Model
 import Sibyl.Forecast (Forecast(..), point, lower, upper, actuals)
-import Sibyl.Safe.TimeSeries (TimeSeries, Period, observations, tsEnd, tsStart)
+import Sibyl.Safe.TimeSeries (TimeSeries, Period, observations, tsEnd, tsStart, tsLength)
 import Sibyl.TimeSeries (mkTimeSeries)
 
 import Data.Maybe (fromJust, fromMaybe)
@@ -40,8 +40,18 @@ data Naive t = Naive
     }
 
 fitNaive :: U.Unbox t => NaiveSettings -> TimeSeries t Double -> Either FitError (Naive t)
-fitNaive = undefined
-
+fitNaive cfg ts
+    | n < 2     = Left (InsufficientData "Need at least 2 observations for naive forecast")
+    | naiveMethod cfg == Seasonal = case period cfg of
+        Nothing -> Left (InvalidModelSpec "Seasonal method requires a period (not Nothing)")
+        Just m
+            | m < 2     -> Left (InvalidModelSpec "Period must be >= 2")
+            | n < 2*m   -> Left (InsufficientData "Need at least 2 full seasons")
+            | otherwise -> Right (Naive cfg ts)
+    | otherwise = Right (Naive cfg ts)
+    where
+        n = tsLength ts
+    
 instance (Ord t, Enum t, U.Unbox t) => SibylModel Naive t where
     forecast     = naiveForecast
     residuals    = naiveResiduals
