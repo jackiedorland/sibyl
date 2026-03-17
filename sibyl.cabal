@@ -53,9 +53,6 @@ test-suite sibyl-test
   other-modules:       Sibyl.AccuracySpec
                        Sibyl.DecompositionSpec
                        Sibyl.FacadeSpec
-                       Sibyl.ForecastSpec
-                       Sibyl.ModelSpec
-                       Sibyl.NaiveSpec
                        Sibyl.PlottingSpec
                        Sibyl.SafeTimeSeriesSpec
                        Sibyl.SmoothingSpec
