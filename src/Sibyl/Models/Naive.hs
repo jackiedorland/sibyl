@@ -11,7 +11,7 @@ import Sibyl.TimeSeries (mkTimeSeries)
 
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Either (fromRight)
-import qualified Sibyl.Accuracy as Acc
+import qualified Sibyl.Accuracy as Accuracy
 import qualified Data.Vector.Unboxed as U
 import qualified Statistics.Sample as Sm
 import Statistics.Distribution (quantile)
@@ -205,10 +205,10 @@ naiveModelSummary naive = ModelSummary
     , converged    = Nothing
     , errors       = Just ErrorMeasures
                     { emMe   = Sm.mean residuals
-                    , emRmse = Acc.rmse residuals
-                    , emMae  = Acc.mae  residuals
-                    , emMape = fromRight (0/0) $ Acc.mape residuals actuals
-                    , emMase = fromRight (0/0) $ Acc.mase residuals naiveScale
+                    , emRmse = Accuracy.rmse residuals
+                    , emMae  = Accuracy.mae  residuals
+                    , emMape = fromRight (0/0) $ Accuracy.mape residuals actuals
+                    , emMase = fromRight (0/0) $ Accuracy.mase residuals naiveScale
                     }
     , training     = TrainingSummary
                     { dataStart  = tsStart innerSeries
@@ -225,7 +225,7 @@ naiveModelSummary naive = ModelSummary
         n           = U.length obs
         m           = fromMaybe 1 (period (settings naive))
         residuals   = naiveResiduals naive
-        naiveScale  = Acc.mae $ U.zipWith (-) (U.drop m obs) (U.take (n-m) obs)
+        naiveScale  = Accuracy.mae $ U.zipWith (-) (U.drop m obs) (U.take (n-m) obs)
         actuals     = case method of
             Last     -> U.drop 1 obs
             Mean     -> obs
