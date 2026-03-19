@@ -424,7 +424,7 @@ autofit :: U.Unbox idx
         -> Either FitError (Fitted 'ARIMA idx)
 ```
 
-`autofit` implements Hyndman-Khandakar: determines differencing order via unit root tests, searches over candidate (p, q) orders, fits each with CSS, compares AICc, and refits the winner with MLE. The return type is `Fitted 'ARIMA idx` with no existential wrapper, because orders are value-level fields inside `FittedARIMA`.
+`autofit` implements Hyndman-Khandakar: determines differencing order via unit root tests, searches over candidate (p, q) orders, fits each with CSS, compares AICc, and refits the winner with MLE. The return type is `Fitted 'ARIMA idx` with no existential wrapper, because orders are value-level fields inside the fitted model.
 
 ---
 
