@@ -6,8 +6,7 @@ module Sibyl.Models.SARIMAX where
 
 import qualified Data.Vector.Unboxed as U
 import Sibyl.Safe.TimeSeries (TimeSeries)
-import Sibyl.Model (ModelFamily(..), Model(..), FitError(..), IC, RegressorMatrix)
-import Sibyl.Prediction (Prediction)
+import Sibyl.Model (ModelFamily(..), Model(..), Fitted, FitError(..), IC, RegressorMatrix, Prediction, Summary)
 
 type PDQ  = (Int, Int, Int)
 type PDQM = (Int, Int, Int, Int)
@@ -48,16 +47,16 @@ instance Model 'ARIMA where
     type Settings 'ARIMA = ARIMASettings
     type Future   'ARIMA = ()
 
-    fit       = fitARIMA
-    predict   = predictARIMA
-    summarize = arimaSummary
-    residuals = arimaResids
-    fitted    = arimaFittedVals
+    fit          = fitARIMA
+    predict      = predictARIMA
+    modelSummary = arimaSummary
+    residuals    = arimaResids
+    fitted       = arimaFittedVals
 
 fitARIMA :: U.Unbox idx => ARIMASettings -> TimeSeries idx Double -> Either FitError (Fitted 'ARIMA idx)
 fitARIMA = undefined
 
-predictARIMA :: U.Unbox idx => Int -> () -> Fitted 'ARIMA idx -> Either FitError (Prediction idx)
+predictARIMA :: (Ord idx, Enum idx, U.Unbox idx) => Int -> () -> Fitted 'ARIMA idx -> Either FitError (Prediction idx)
 predictARIMA = undefined
 
 arimaSummary :: U.Unbox idx => Fitted 'ARIMA idx -> Summary idx
@@ -101,16 +100,16 @@ instance Model 'SARIMA where
     type Settings 'SARIMA = SARIMASettings
     type Future   'SARIMA = ()
 
-    fit       = fitSARIMA
-    predict   = predictSARIMA
-    summarize = sarimaSummary
-    residuals = sarimaResids
-    fitted    = sarimaFittedVals
+    fit          = fitSARIMA
+    predict      = predictSARIMA
+    modelSummary = sarimaSummary
+    residuals    = sarimaResids
+    fitted       = sarimaFittedVals
 
 fitSARIMA :: U.Unbox idx => SARIMASettings -> TimeSeries idx Double -> Either FitError (Fitted 'SARIMA idx)
 fitSARIMA = undefined
 
-predictSARIMA :: U.Unbox idx => Int -> () -> Fitted 'SARIMA idx -> Either FitError (Prediction idx)
+predictSARIMA :: (Ord idx, Enum idx, U.Unbox idx) => Int -> () -> Fitted 'SARIMA idx -> Either FitError (Prediction idx)
 predictSARIMA = undefined
 
 sarimaSummary :: U.Unbox idx => Fitted 'SARIMA idx -> Summary idx
@@ -155,16 +154,16 @@ instance Model 'SARIMAX where
     type Settings 'SARIMAX = SARIMAXSettings
     type Future   'SARIMAX = RegressorMatrix
 
-    fit       = fitSARIMAX
-    predict   = predictSARIMAX
-    summarize = sarimaxSummary
-    residuals = sarimaxResids
-    fitted    = sarimaxFittedVals
+    fit          = fitSARIMAX
+    predict      = predictSARIMAX
+    modelSummary = sarimaxSummary
+    residuals    = sarimaxResids
+    fitted       = sarimaxFittedVals
 
 fitSARIMAX :: U.Unbox idx => SARIMAXSettings -> TimeSeries idx Double -> Either FitError (Fitted 'SARIMAX idx)
 fitSARIMAX = undefined
 
-predictSARIMAX :: U.Unbox idx => Int -> RegressorMatrix -> Fitted 'SARIMAX idx -> Either FitError (Prediction idx)
+predictSARIMAX :: (Ord idx, Enum idx, U.Unbox idx) => Int -> RegressorMatrix -> Fitted 'SARIMAX idx -> Either FitError (Prediction idx)
 predictSARIMAX = undefined
 
 sarimaxSummary :: U.Unbox idx => Fitted 'SARIMAX idx -> Summary idx
