@@ -1,12 +1,13 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Sibyl.Models.SARIMAX where
 
 import qualified Data.Vector.Unboxed as U
 import Sibyl.Safe.TimeSeries (TimeSeries)
-import Sibyl.Model (Model(..), Forecastable(..), ForecastableWith(..), FitError(..), IC, RegressorMatrix)
-import Sibyl.Forecast (Forecast)
+import Sibyl.Model (ModelFamily(..), Model(..), FitError(..), IC, RegressorMatrix)
+import Sibyl.Prediction (Prediction)
 
 type PDQ  = (Int, Int, Int)
 type PDQM = (Int, Int, Int, Int)
@@ -24,69 +25,43 @@ data ARIMASettings = ARIMASettings
     , arimaAllowDrift :: Bool
     , arimaMethod     :: EstimationMethod
     , arimaStepwise   :: Bool
+    , arimaCILevel    :: Double
     , arimaLambda     :: Maybe Double
     } deriving (Show, Eq)
 
 defaultARIMASettings :: ARIMASettings
 defaultARIMASettings = undefined
 
-data ARIMA t = ARIMA
-    { arimaSettings  :: ARIMASettings
-    , arimaCoeffs    :: U.Vector Double  -- AR then MA coefficients
-    , arimaCoeffSEs  :: U.Vector Double  -- standard errors; empty if CSS
-    , arimaResids    :: U.Vector Double
-    , arimaFitted    :: U.Vector Double
-    , arimaSigma2    :: Double
-    , arimaLogLik    :: Maybe Double     -- Nothing if CSS
-    , arimaConverged :: Maybe Bool       -- Nothing if CSS
-    , arimaSeries    :: TimeSeries t Double
+data instance Fitted 'ARIMA idx = FittedARIMA
+    { arimaSettings   :: ARIMASettings
+    , arimaCoeffs     :: U.Vector Double
+    , arimaCoeffSEs   :: U.Vector Double
+    , arimaResids     :: U.Vector Double
+    , arimaFittedVals :: U.Vector Double
+    , arimaSigma2     :: Double
+    , arimaLogLik     :: Maybe Double
+    , arimaConverged  :: Maybe Bool
+    , arimaSeries     :: TimeSeries idx Double
     }
 
-fitARIMA :: U.Unbox t => PDQ -> TimeSeries t Double -> Either FitError (ARIMA t)
+instance Model 'ARIMA where
+    type Settings 'ARIMA = ARIMASettings
+    type Future   'ARIMA = ()
+
+    fit       = fitARIMA
+    predict   = predictARIMA
+    summarize = arimaSummary
+    residuals = arimaResids
+    fitted    = arimaFittedVals
+
+fitARIMA :: U.Unbox idx => ARIMASettings -> TimeSeries idx Double -> Either FitError (Fitted 'ARIMA idx)
 fitARIMA = undefined
 
-fitARIMAWith :: U.Unbox t => ARIMASettings -> TimeSeries t Double -> Either FitError (ARIMA t)
-fitARIMAWith = undefined
+predictARIMA :: U.Unbox idx => Int -> () -> Fitted 'ARIMA idx -> Either FitError (Prediction idx)
+predictARIMA = undefined
 
-forecastARIMA :: (Ord t, Enum t, U.Unbox t) => Int -> ARIMA t -> Forecast t
-forecastARIMA = undefined
-
-instance (Ord t, Enum t, U.Unbox t) => Model ARIMA t where
-    residuals    = arimaResids
-    fitted       = arimaFitted
-    modelSummary = undefined
-
-instance (Ord t, Enum t, U.Unbox t) => Forecastable ARIMA t where
-    forecast = forecastARIMA
-
--- ARIMAX
-
-data ARIMAX t = ARIMAX
-    { arimaxSettings  :: ARIMASettings
-    , arimaxCoeffs    :: U.Vector Double  -- AR, MA, then regressor coefficients
-    , arimaxCoeffSEs  :: U.Vector Double
-    , arimaxResids    :: U.Vector Double
-    , arimaxFitted    :: U.Vector Double
-    , arimaxSigma2    :: Double
-    , arimaxLogLik    :: Maybe Double
-    , arimaxConverged :: Maybe Bool
-    , arimaxSeries    :: TimeSeries t Double
-    , arimaxTrainRegs :: RegressorMatrix  -- regressors used during fitting
-    }
-
-fitARIMAX :: U.Unbox t => PDQ -> TimeSeries t Double -> RegressorMatrix -> Either FitError (ARIMAX t)
-fitARIMAX = undefined
-
-fitARIMAXWith :: U.Unbox t => ARIMASettings -> TimeSeries t Double -> RegressorMatrix -> Either FitError (ARIMAX t)
-fitARIMAXWith = undefined
-
-instance (Ord t, Enum t, U.Unbox t) => Model ARIMAX t where
-    residuals    = arimaxResids
-    fitted       = arimaxFitted
-    modelSummary = undefined
-
-instance (Ord t, Enum t, U.Unbox t) => ForecastableWith RegressorMatrix ARIMAX t where
-    forecastWith = undefined
+arimaSummary :: U.Unbox idx => Fitted 'ARIMA idx -> Summary idx
+arimaSummary = undefined
 
 -- SARIMA
 
@@ -103,66 +78,94 @@ data SARIMASettings = SARIMASettings
     , sarimaAllowDrift :: Bool
     , sarimaMethod     :: EstimationMethod
     , sarimaStepwise   :: Bool
+    , sarimaCILevel    :: Double
     , sarimaLambda     :: Maybe Double
     } deriving (Show, Eq)
 
 defaultSARIMASettings :: SARIMASettings
 defaultSARIMASettings = undefined
 
-data SARIMA t = SARIMA
-    { sarimaSettings  :: SARIMASettings
-    , sarimaCoeffs    :: U.Vector Double  -- AR, MA, SAR, SMA coefficients
-    , sarimaCoeffSEs  :: U.Vector Double
-    , sarimaResids    :: U.Vector Double
-    , sarimaFitted    :: U.Vector Double
-    , sarimaSigma2    :: Double
-    , sarimaLogLik    :: Maybe Double
-    , sarimaConverged :: Maybe Bool
-    , sarimaSeries    :: TimeSeries t Double
+data instance Fitted 'SARIMA idx = FittedSARIMA
+    { sarimaSettings   :: SARIMASettings
+    , sarimaCoeffs     :: U.Vector Double
+    , sarimaCoeffSEs   :: U.Vector Double
+    , sarimaResids     :: U.Vector Double
+    , sarimaFittedVals :: U.Vector Double
+    , sarimaSigma2     :: Double
+    , sarimaLogLik     :: Maybe Double
+    , sarimaConverged  :: Maybe Bool
+    , sarimaSeries     :: TimeSeries idx Double
     }
 
-fitSARIMA :: U.Unbox t => PDQ -> PDQM -> TimeSeries t Double -> Either FitError (SARIMA t)
+instance Model 'SARIMA where
+    type Settings 'SARIMA = SARIMASettings
+    type Future   'SARIMA = ()
+
+    fit       = fitSARIMA
+    predict   = predictSARIMA
+    summarize = sarimaSummary
+    residuals = sarimaResids
+    fitted    = sarimaFittedVals
+
+fitSARIMA :: U.Unbox idx => SARIMASettings -> TimeSeries idx Double -> Either FitError (Fitted 'SARIMA idx)
 fitSARIMA = undefined
 
-fitSARIMAWith :: U.Unbox t => SARIMASettings -> TimeSeries t Double -> Either FitError (SARIMA t)
-fitSARIMAWith = undefined
+predictSARIMA :: U.Unbox idx => Int -> () -> Fitted 'SARIMA idx -> Either FitError (Prediction idx)
+predictSARIMA = undefined
 
-forecastSARIMA :: (Ord t, Enum t, U.Unbox t) => Int -> SARIMA t -> Forecast t
-forecastSARIMA = undefined
-
-instance (Ord t, Enum t, U.Unbox t) => Model SARIMA t where
-    residuals    = sarimaResids
-    fitted       = sarimaFitted
-    modelSummary = undefined
-
-instance (Ord t, Enum t, U.Unbox t) => Forecastable SARIMA t where
-    forecast = forecastSARIMA
+sarimaSummary :: U.Unbox idx => Fitted 'SARIMA idx -> Summary idx
+sarimaSummary = undefined
 
 -- SARIMAX
 
-data SARIMAX t = SARIMAX
-    { sarimaxSettings  :: SARIMASettings
-    , sarimaxCoeffs    :: U.Vector Double  -- AR, MA, SAR, SMA, regressor coefficients
-    , sarimaxCoeffSEs  :: U.Vector Double
-    , sarimaxResids    :: U.Vector Double
-    , sarimaxFitted    :: U.Vector Double
-    , sarimaxSigma2    :: Double
-    , sarimaxLogLik    :: Maybe Double
-    , sarimaxConverged :: Maybe Bool
-    , sarimaxSeries    :: TimeSeries t Double
-    , sarimaxTrainRegs :: RegressorMatrix
+data SARIMAXSettings = SARIMAXSettings
+    { sarimaxP          :: Int
+    , sarimaxD          :: Int
+    , sarimaxQ          :: Int
+    , sarimaxBigP       :: Int
+    , sarimaxBigD       :: Int
+    , sarimaxBigQ       :: Int
+    , sarimaxPeriod     :: Int
+    , sarimaxIC         :: IC
+    , sarimaxAllowMean  :: Bool
+    , sarimaxAllowDrift :: Bool
+    , sarimaxMethod     :: EstimationMethod
+    , sarimaxStepwise   :: Bool
+    , sarimaxCILevel    :: Double
+    , sarimaxLambda     :: Maybe Double
+    , sarimaxTrainRegs  :: RegressorMatrix
+    } deriving (Show, Eq)
+
+defaultSARIMAXSettings :: SARIMAXSettings
+defaultSARIMAXSettings = undefined
+
+data instance Fitted 'SARIMAX idx = FittedSARIMAX
+    { sarimaxSettings   :: SARIMAXSettings
+    , sarimaxCoeffs     :: U.Vector Double
+    , sarimaxCoeffSEs   :: U.Vector Double
+    , sarimaxResids     :: U.Vector Double
+    , sarimaxFittedVals :: U.Vector Double
+    , sarimaxSigma2     :: Double
+    , sarimaxLogLik     :: Maybe Double
+    , sarimaxConverged  :: Maybe Bool
+    , sarimaxSeries     :: TimeSeries idx Double
     }
 
-fitSARIMAX :: U.Unbox t => PDQ -> PDQM -> TimeSeries t Double -> RegressorMatrix -> Either FitError (SARIMAX t)
+instance Model 'SARIMAX where
+    type Settings 'SARIMAX = SARIMAXSettings
+    type Future   'SARIMAX = RegressorMatrix
+
+    fit       = fitSARIMAX
+    predict   = predictSARIMAX
+    summarize = sarimaxSummary
+    residuals = sarimaxResids
+    fitted    = sarimaxFittedVals
+
+fitSARIMAX :: U.Unbox idx => SARIMAXSettings -> TimeSeries idx Double -> Either FitError (Fitted 'SARIMAX idx)
 fitSARIMAX = undefined
 
-fitSARIMAXWith :: U.Unbox t => SARIMASettings -> TimeSeries t Double -> RegressorMatrix -> Either FitError (SARIMAX t)
-fitSARIMAXWith = undefined
+predictSARIMAX :: U.Unbox idx => Int -> RegressorMatrix -> Fitted 'SARIMAX idx -> Either FitError (Prediction idx)
+predictSARIMAX = undefined
 
-instance (Ord t, Enum t, U.Unbox t) => Model SARIMAX t where
-    residuals    = sarimaxResids
-    fitted       = sarimaxFitted
-    modelSummary = undefined
-
-instance (Ord t, Enum t, U.Unbox t) => ForecastableWith RegressorMatrix SARIMAX t where
-    forecastWith = undefined
+sarimaxSummary :: U.Unbox idx => Fitted 'SARIMAX idx -> Summary idx
+sarimaxSummary = undefined
