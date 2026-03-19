@@ -19,6 +19,8 @@ The design prioritizes:
 
 The main tradeoff is a **closed kind**: new model families (e.g. Prophet) cannot be added without modifying Sibyl's source. This is accepted because Sibyl is in early development and the set of planned model families is known. If third-party extensibility becomes a priority later, migrating to open type tags is straightforward; otherwise, a new model family could simply be a PR or fork to Sibyl itself instead of an extending package. (This has the side effect of inducing people to contribute to Sibyl when they want to use our tooling for their models, which is good?)
 
+##### Note: TimeSeries are represented internally by two unboxed vectors (TimeSeries idx Double), with invariants enforced using smart constructors `mkTimeSeries`
+
 ---
  
 ## Approaches Considered

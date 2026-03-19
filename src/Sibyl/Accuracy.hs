@@ -1,11 +1,10 @@
 module Sibyl.Accuracy
-  ( mae, rmse, mape, mase, maseFromModel
+  ( mae, rmse, mape, mase
   , AccuracyError(..)
   ) where
 
 import qualified Data.Vector.Unboxed as U
 import Statistics.Sample as Sm
-import Sibyl.Model (Model(..), naiveScale, training, modelSummary)
 
 data AccuracyError
     = ZeroInActuals
@@ -29,5 +28,3 @@ mase resids scale
     | scale == 0 = Left ConstantTraining
     | otherwise  = Right $ mae resids / scale
 
-maseFromModel :: Model m t => m t -> Either AccuracyError Double
-maseFromModel m = mase (residuals m) (naiveScale (training (modelSummary m)))

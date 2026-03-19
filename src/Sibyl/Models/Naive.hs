@@ -1,11 +1,20 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE DisambiguateRecordFields #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE FlexibleInstances     #-}
 
-module Sibyl.Models.Naive where
+module Sibyl.Models.Naive
+  ( NaiveMethod(..)
+  , NaiveSettings(..)
+  , defaultNaiveSettings
+  , fitNaive
+  , fitNaiveWith
+  ) where
 
-import Sibyl.Model (Model(..), Forecastable(..), ModelSummary(..), FitError(..), TrainingSummary(..), ErrorMeasures(..), InformationCriteria(..))
-import Sibyl.Forecast (Forecast(..), point, lower, upper, actuals)
+import Sibyl.Model
+  ( Model(..), ModelFamily(..), Fitted
+  , Prediction(..), Summary(..), FitError(..)
+  , TrainingSummary(..), ErrorMeasures(..)
+  )
 import Sibyl.Safe.TimeSeries (TimeSeries, Period, observations, tsEnd, tsStart, tsLength)
 import Sibyl.TimeSeries (mkTimeSeries)
 
@@ -19,13 +28,13 @@ import Statistics.Distribution.Normal (standard)
 import Statistics.Distribution.StudentT (studentT)
 
 data NaiveMethod
-    = Last 
-    | Mean 
-    | Drift 
+    = Last
+    | Mean
+    | Drift
     | Seasonal
     deriving (Show, Eq)
 
-data NaiveSettings = NaiveSettings 
+data NaiveSettings = NaiveSettings
     { naiveMethod  :: NaiveMethod
     , period       :: Maybe Period
     , naiveCiLevel :: Double
@@ -34,15 +43,15 @@ data NaiveSettings = NaiveSettings
 defaultNaiveSettings :: NaiveSettings
 defaultNaiveSettings = NaiveSettings Last Nothing 0.95
 
-data Naive t = Naive 
-    { settings    :: NaiveSettings
-    , naiveSeries :: TimeSeries t Double
+data instance Fitted 'Naive idx = FittedNaive
+    { naiveSettings :: NaiveSettings
+    , naiveSeries   :: TimeSeries idx Double
     }
 
-fitNaive :: U.Unbox t => TimeSeries t Double -> Either FitError (Naive t)
+fitNaive :: U.Unbox idx => TimeSeries idx Double -> Either FitError (Fitted 'Naive idx)
 fitNaive = fitNaiveWith defaultNaiveSettings
 
-fitNaiveWith :: U.Unbox t => NaiveSettings -> TimeSeries t Double -> Either FitError (Naive t)
+fitNaiveWith :: U.Unbox idx => NaiveSettings -> TimeSeries idx Double -> Either FitError (Fitted 'Naive idx)
 fitNaiveWith cfg ts
     | n < 2     = Left (InsufficientData "Need at least 2 observations for naive forecast")
     | naiveMethod cfg == Seasonal = case period cfg of
@@ -50,43 +59,43 @@ fitNaiveWith cfg ts
         Just m
             | m < 2     -> Left (InvalidModelSpec "Period must be >= 2")
             | n < 2*m   -> Left (InsufficientData "Need at least 2 full seasons")
-            | otherwise -> Right (Naive cfg ts)
-    | otherwise = Right (Naive cfg ts)
+            | otherwise -> Right (FittedNaive cfg ts)
+    | otherwise = Right (FittedNaive cfg ts)
     where
         n = tsLength ts
 
-instance (Ord t, Enum t, U.Unbox t) => Model Naive t where
+instance Model 'Naive where
+    type Settings 'Naive = NaiveSettings
+    type Future   'Naive = ()
+
+    fit          = fitNaiveWith
+    predict      = naivePredict
+    modelSummary = naiveModelSummary
     residuals    = naiveResiduals
     fitted       = naiveFitted
-    modelSummary = naiveModelSummary
 
-instance (Ord t, Enum t, U.Unbox t) => Forecastable Naive t where
-    forecast = naiveForecast
+naivePredict :: (Ord idx, Enum idx, U.Unbox idx) => Int -> () -> Fitted 'Naive idx -> Either FitError (Prediction idx)
+naivePredict h _ fn = case naiveMethod (naiveSettings fn) of
+    Last     -> naivePredictLast     h fn
+    Mean     -> naivePredictMean     h fn
+    Drift    -> naivePredictDrift    h fn
+    Seasonal -> naivePredictSeasonal h fn
 
-naiveForecast :: (Ord t, Enum t, U.Unbox t) => Int -> Naive t -> Forecast t
-naiveForecast h naive = case naiveMethod (settings naive) of
-        Last     -> naiveForecastLast     h naive
-        Mean     -> naiveForecastMean     h naive
-        Drift    -> naiveForecastDrift    h naive
-        Seasonal -> naiveForecastSeasonal h naive
-
-naiveForecastLast :: (Ord t, Enum t, U.Unbox t) => Int -> Naive t -> Forecast t
-naiveForecastLast h naive = Forecast 
-    { point = mkTimeSeries futures pointVals
-    , lower = mkTimeSeries futures (U.zipWith (-) pointVals halfWidths)
-    , upper = mkTimeSeries futures (U.zipWith (+) pointVals halfWidths)
-    , ciLevel = naiveCiLevel nsettings
-    , residuals = resids
-    , actuals = U.drop 1 obs
+naivePredictLast :: (Ord idx, Enum idx, U.Unbox idx) => Int -> Fitted 'Naive idx -> Either FitError (Prediction idx)
+naivePredictLast h fn = Right Prediction
+    { predPoint     = mkTimeSeries futures pointVals
+    , predLower     = mkTimeSeries futures (U.zipWith (-) pointVals halfWidths)
+    , predUpper     = mkTimeSeries futures (U.zipWith (+) pointVals halfWidths)
+    , predCILevel   = naiveCiLevel nsettings
+    , predResiduals = resids
+    , predActuals   = U.drop 1 obs
     }
     where
-        -- setup
-        innerSeries = naiveSeries naive
-        nsettings   = settings naive
+        innerSeries = naiveSeries fn
+        nsettings   = naiveSettings fn
         obs         = observations innerSeries
-        resids      = naiveInSampleResiduals naive
+        resids      = naiveInSampleResiduals fn
         lastIdx     = tsEnd innerSeries
-        -- statistics
         n           = U.length obs
         sigma       = sqrt $ Sm.mean $ U.map (^2) resids
         z           = quantile standard ((1 + naiveCiLevel nsettings) / 2)
@@ -94,23 +103,21 @@ naiveForecastLast h naive = Forecast
         pointVals   = U.replicate h (U.last obs)
         halfWidths  = U.generate h (\k -> z * sigma * sqrt (fromIntegral (k+1)))
 
-naiveForecastMean :: (Ord t, Enum t, U.Unbox t) => Int -> Naive t -> Forecast t
-naiveForecastMean h naive = Forecast 
-    { point = mkTimeSeries futures pointVals
-    , lower = mkTimeSeries futures (U.zipWith (-) pointVals halfWidths)
-    , upper = mkTimeSeries futures (U.zipWith (+) pointVals halfWidths)
-    , ciLevel = naiveCiLevel nsettings
-    , residuals = resids
-    , actuals = obs
+naivePredictMean :: (Ord idx, Enum idx, U.Unbox idx) => Int -> Fitted 'Naive idx -> Either FitError (Prediction idx)
+naivePredictMean h fn = Right Prediction
+    { predPoint     = mkTimeSeries futures pointVals
+    , predLower     = mkTimeSeries futures (U.zipWith (-) pointVals halfWidths)
+    , predUpper     = mkTimeSeries futures (U.zipWith (+) pointVals halfWidths)
+    , predCILevel   = naiveCiLevel nsettings
+    , predResiduals = resids
+    , predActuals   = obs
     }
     where
-        -- setup
-        innerSeries = naiveSeries naive
-        nsettings   = settings naive
+        innerSeries = naiveSeries fn
+        nsettings   = naiveSettings fn
         obs         = observations innerSeries
-        resids      = naiveInSampleResiduals naive
+        resids      = naiveInSampleResiduals fn
         lastIdx     = tsEnd innerSeries
-        -- statistics
         n           = U.length obs
         sigma       = sqrt $ Sm.varianceUnbiased resids
         z           = quantile (studentT (fromIntegral (n - 1))) ((1 + naiveCiLevel nsettings) / 2)
@@ -118,23 +125,21 @@ naiveForecastMean h naive = Forecast
         pointVals   = U.replicate h (Sm.mean obs)
         halfWidths  = U.replicate h (z * sigma * sqrt (1 + 1 / fromIntegral n))
 
-naiveForecastDrift :: (Ord t, Enum t, U.Unbox t) => Int -> Naive t -> Forecast t
-naiveForecastDrift h naive = Forecast 
-    { point = mkTimeSeries futures pointVals
-    , lower = mkTimeSeries futures (U.zipWith (-) pointVals halfWidths)
-    , upper = mkTimeSeries futures (U.zipWith (+) pointVals halfWidths)
-    , ciLevel = naiveCiLevel nsettings
-    , residuals = resids
-    , actuals = U.drop 1 obs
+naivePredictDrift :: (Ord idx, Enum idx, U.Unbox idx) => Int -> Fitted 'Naive idx -> Either FitError (Prediction idx)
+naivePredictDrift h fn = Right Prediction
+    { predPoint     = mkTimeSeries futures pointVals
+    , predLower     = mkTimeSeries futures (U.zipWith (-) pointVals halfWidths)
+    , predUpper     = mkTimeSeries futures (U.zipWith (+) pointVals halfWidths)
+    , predCILevel   = naiveCiLevel nsettings
+    , predResiduals = resids
+    , predActuals   = U.drop 1 obs
     }
     where
-        -- setup
-        innerSeries = naiveSeries naive
-        nsettings   = settings naive
+        innerSeries = naiveSeries fn
+        nsettings   = naiveSettings fn
         obs         = observations innerSeries
-        resids      = naiveInSampleResiduals naive
+        resids      = naiveInSampleResiduals fn
         lastIdx     = tsEnd innerSeries
-        -- statistics
         n           = U.length obs
         slope       = (U.last obs - U.head obs) / fromIntegral (n - 1)
         sigma       = sqrt $ Sm.mean $ U.map (^2) resids
@@ -144,23 +149,21 @@ naiveForecastDrift h naive = Forecast
         halfWidths  = U.generate h (\k -> let k' = fromIntegral (k+1)
                                            in z * sigma * sqrt (k' * (1 + k' / fromIntegral n)))
 
-naiveForecastSeasonal :: (Ord t, Enum t, U.Unbox t) => Int -> Naive t -> Forecast t
-naiveForecastSeasonal h naive = Forecast 
-    { point = mkTimeSeries futures pointVals
-    , lower = mkTimeSeries futures (U.zipWith (-) pointVals halfWidths)
-    , upper = mkTimeSeries futures (U.zipWith (+) pointVals halfWidths)
-    , ciLevel = naiveCiLevel cfg
-    , residuals = resids
-    , actuals = U.drop m obs
+naivePredictSeasonal :: (Ord idx, Enum idx, U.Unbox idx) => Int -> Fitted 'Naive idx -> Either FitError (Prediction idx)
+naivePredictSeasonal h fn = Right Prediction
+    { predPoint     = mkTimeSeries futures pointVals
+    , predLower     = mkTimeSeries futures (U.zipWith (-) pointVals halfWidths)
+    , predUpper     = mkTimeSeries futures (U.zipWith (+) pointVals halfWidths)
+    , predCILevel   = naiveCiLevel cfg
+    , predResiduals = resids
+    , predActuals   = U.drop m obs
     }
     where
-        -- setup
-        innerSeries = naiveSeries naive
-        cfg         = settings naive
+        innerSeries = naiveSeries fn
+        cfg         = naiveSettings fn
         obs         = observations innerSeries
-        resids      = naiveInSampleResiduals naive
+        resids      = naiveInSampleResiduals fn
         lastIdx     = tsEnd innerSeries
-        -- statistics
         n           = U.length obs
         m           = fromJust $ period cfg
         sigma       = sqrt $ Sm.mean $ U.map (^2) resids
@@ -169,64 +172,64 @@ naiveForecastSeasonal h naive = Forecast
         pointVals   = U.generate h (\k -> obs U.! (n - m + (k `mod` m)))
         halfWidths  = U.generate h (\k -> z * sigma * sqrt (fromIntegral (k `div` m + 1)))
 
-naiveInSampleResiduals :: Naive t -> U.Vector Double
-naiveInSampleResiduals naive = case naiveMethod (settings naive) of
+naiveInSampleResiduals :: Fitted 'Naive idx -> U.Vector Double
+naiveInSampleResiduals fn = case naiveMethod (naiveSettings fn) of
         Last     -> U.zipWith (-) (U.drop 1 obs) (U.take (n-1) obs)
         Mean     -> U.map (subtract $ Sm.mean obs) obs
         Drift    -> U.zipWith (\next cur -> next - (cur + slope)) (U.drop 1 obs) (U.take (n-1) obs)
         Seasonal -> U.zipWith (-) (U.drop m obs) (U.take (n-m) obs)
-    where 
-        obs   = observations $ naiveSeries naive
+    where
+        obs   = observations $ naiveSeries fn
         slope = (U.last obs - U.head obs) / fromIntegral (n-1)
         n     = U.length obs
-        m     = fromJust $ period (settings naive)
+        m     = fromJust $ period (naiveSettings fn)
 
-naiveResiduals :: Naive t -> U.Vector Double
+naiveResiduals :: Fitted 'Naive idx -> U.Vector Double
 naiveResiduals = naiveInSampleResiduals
 
-naiveFitted :: Naive t -> U.Vector Double
-naiveFitted naive = U.zipWith (-) actuals (naiveInSampleResiduals naive)
+naiveFitted :: Fitted 'Naive idx -> U.Vector Double
+naiveFitted fn = U.zipWith (-) acts (naiveInSampleResiduals fn)
   where
-    obs     = observations (naiveSeries naive)
-    n       = U.length obs
-    m       = fromJust $ period (settings naive)
-    actuals = case naiveMethod (settings naive) of
+    obs  = observations (naiveSeries fn)
+    n    = U.length obs
+    m    = fromJust $ period (naiveSettings fn)
+    acts = case naiveMethod (naiveSettings fn) of
       Last     -> U.drop 1 obs
       Mean     -> obs
       Drift    -> U.drop 1 obs
       Seasonal -> U.drop m obs
 
-naiveModelSummary :: U.Unbox t => Naive t -> ModelSummary t
-naiveModelSummary naive = ModelSummary
-    { name         = "Naive model" ++ "(" ++ show method ++ ")"
-    , coefficients = []
-    , criteria     = Nothing
-    , logLik       = Nothing
-    , converged    = Nothing
-    , errors       = Just ErrorMeasures
-                    { emMe   = Sm.mean residuals
-                    , emRmse = Accuracy.rmse residuals
-                    , emMae  = Accuracy.mae  residuals
-                    , emMape = fromRight (0/0) $ Accuracy.mape residuals actuals
-                    , emMase = fromRight (0/0) $ Accuracy.mase residuals naiveScale
-                    }
-    , training     = TrainingSummary
-                    { dataStart  = tsStart innerSeries
-                    , dataEnd    = tsEnd innerSeries
-                    , nObs       = n
-                    , sigma2     = Sm.varianceUnbiased residuals
-                    , naiveScale = naiveScale
-                    }
+naiveModelSummary :: U.Unbox idx => Fitted 'Naive idx -> Summary idx
+naiveModelSummary fn = Summary
+    { summaryName      = "Naive (" ++ show method ++ ")"
+    , summaryCoeffs    = []
+    , summaryCriteria  = Nothing
+    , summaryLogLik    = Nothing
+    , summaryConverged = Nothing
+    , summaryErrors    = Just ErrorMeasures
+                        { emMe   = Sm.mean resids
+                        , emRmse = Accuracy.rmse resids
+                        , emMae  = Accuracy.mae  resids
+                        , emMape = fromRight (0/0) $ Accuracy.mape resids acts
+                        , emMase = fromRight (0/0) $ Accuracy.mase resids naiveScaleVal
+                        }
+    , summaryTraining  = TrainingSummary
+                        { dataStart  = tsStart innerSeries
+                        , dataEnd    = tsEnd innerSeries
+                        , nObs       = n
+                        , sigma2     = Sm.varianceUnbiased resids
+                        , naiveScale = naiveScaleVal
+                        }
     }
     where
-        method      = naiveMethod (settings naive)
-        innerSeries = naiveSeries naive
-        obs         = observations innerSeries
-        n           = U.length obs
-        m           = fromMaybe 1 (period (settings naive))
-        residuals   = naiveResiduals naive
-        naiveScale  = Accuracy.mae $ U.zipWith (-) (U.drop m obs) (U.take (n-m) obs)
-        actuals     = case method of
+        method       = naiveMethod (naiveSettings fn)
+        innerSeries  = naiveSeries fn
+        obs          = observations innerSeries
+        n            = U.length obs
+        m            = fromMaybe 1 (period (naiveSettings fn))
+        resids       = naiveResiduals fn
+        naiveScaleVal = Accuracy.mae $ U.zipWith (-) (U.drop m obs) (U.take (n-m) obs)
+        acts         = case method of
             Last     -> U.drop 1 obs
             Mean     -> obs
             Drift    -> U.drop 1 obs
