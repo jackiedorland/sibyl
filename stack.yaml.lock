@@ -32,6 +32,13 @@ packages:
       size: 1667
   original:
     hackage: random-1.3.1
+- completed:
+    hackage: hmatrix-0.20.2@sha256:0d79c947523faf70b4962d6bfa6c00672983ad749073971ace204dd71a149694,5226
+    pantry-tree:
+      sha256: e9dd4b69fc5301b55396df97c01713f26f404c7fbf6606955906eb04ffefc483
+      size: 2228
+  original:
+    hackage: hmatrix-0.20.2
 snapshots:
 - completed:
     sha256: 4d196b02eb766d92e462f1da7b72c0ded25dbec910ac74746bf179cfcceb3811

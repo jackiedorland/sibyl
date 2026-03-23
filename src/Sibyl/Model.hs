@@ -20,6 +20,7 @@ module Sibyl.Model
 import Data.Kind (Type)
 import qualified Data.Vector.Unboxed as U
 import Sibyl.TimeSeries (TimeSeries)
+import qualified Numeric.LinearAlgebra as LinAlg
 
 data ModelFamily
   = ARIMA
@@ -49,9 +50,7 @@ data IC = AIC | AICc | BIC deriving (Show, Eq)
 
 data RegressorMatrix = RegressorMatrix
   { regressorNames :: [String]
-  , regressorData  :: U.Vector Double
-  , regressorRows  :: Int
-  , regressorCols  :: Int
+  , regressorData  :: LinAlg.Matrix Double
   } deriving (Show, Eq)
 
 data Prediction idx = Prediction

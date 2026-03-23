@@ -31,7 +31,8 @@ library
                        vector >= 0.13,
                        statistics >= 0.16,
                        text >= 2.1.3 && < 2.2,
-                       dataframe >= 1.0.0.0 && < 1.1.0.0
+                       dataframe >= 1.0.0.0 && < 1.1.0.0,
+                       hmatrix == 0.20.2
   ghc-options:         -Wall
                        -Wcompat
                        -Widentities

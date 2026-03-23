@@ -254,7 +254,7 @@ diff ts
     timeIndex = index ts
     n = U.length timeIndex
 
-toFromDFExcept :: U.Unbox a => Either DataFrameException a -> Either ConversionError a
+toFromDFExcept :: Either DataFrameException a -> Either ConversionError a
 toFromDFExcept = first DataFrameError
 
 fromDataFrame :: forall t. (Columnable t, U.Unbox t)
@@ -264,7 +264,7 @@ fromDataFrame colA colB df = do
   obsV   <- toFromDFExcept $ D.columnAsDoubleVector  (D.col @Double colB) df -- TODO: change to castWith when DataFrame compiles on my stack version (weird pragma B.S.)
   first InvalidSeries $ mkTimeSeries indexV obsV
 
-toDataFrame   :: (U.Unbox t, U.Unbox y) 
+toDataFrame   :: (Columnable t, Columnable y, U.Unbox t, U.Unbox y)
               => TimeSeries t y -> DataFrame
 toDataFrame ts = D.fromNamedColumns
   [ (T.pack $ "index",        D.fromUnboxedVector (index ts))
