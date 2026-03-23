@@ -1,7 +1,7 @@
 module Sibyl.SafeTimeSeriesSpec (spec) where
 
 import qualified Data.Vector.Unboxed as U
-import qualified Sibyl.Safe.TimeSeries as SafeTS
+import qualified Sibyl.TimeSeries as SafeTS
 import Test.Hspec
 
 spec :: Spec

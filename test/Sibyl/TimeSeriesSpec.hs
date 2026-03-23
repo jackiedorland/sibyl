@@ -4,7 +4,7 @@ import Control.Exception (evaluate)
 import Test.Hspec
 import Test.QuickCheck
 import qualified Data.Vector.Unboxed as U
-import Sibyl.TimeSeries
+import Sibyl
 
 -- sorry i know this isn't very Haskelly but I prefer it - jackie
 (???) :: (HasCallStack, Show a, Eq a) => a -> a -> Expectation 

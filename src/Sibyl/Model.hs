@@ -19,7 +19,7 @@ module Sibyl.Model
 
 import Data.Kind (Type)
 import qualified Data.Vector.Unboxed as U
-import Sibyl.Safe.TimeSeries (TimeSeries)
+import Sibyl.TimeSeries (TimeSeries)
 
 data ModelFamily
   = ARIMA

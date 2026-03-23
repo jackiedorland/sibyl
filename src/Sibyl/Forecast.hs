@@ -1,7 +1,7 @@
 module Sibyl.Forecast where
 
 import qualified Data.Vector.Unboxed as U
-import Sibyl.Safe.TimeSeries (TimeSeries)
+import Sibyl.TimeSeries (TimeSeries)
 
 data Forecast t = Forecast
   { point     :: TimeSeries t Double -- h point forecasts

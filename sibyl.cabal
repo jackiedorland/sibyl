@@ -17,7 +17,6 @@ library
   hs-source-dirs:      src
   exposed-modules:     Sibyl
                        Sibyl.TimeSeries
-                       Sibyl.Safe.TimeSeries
                        Sibyl.Model
                        Sibyl.Forecast
                        Sibyl.Smoothing

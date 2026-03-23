@@ -20,7 +20,7 @@
 
 ### Why Sibyl?
 
-Haskell has strong numerical libraries (`statistics`, `hmatrix`, `vector`) but nothing equivalent to R's `forecast` or Python's `statsmodels`. Anyone doing time series work in Haskell today has to either call out to R or Python via FFI, or implement everything themselves. Sibyl is designed to change that.
+Haskell has strong numerical libraries (`statistics`, `hmatrix`, `vector`) but nothing equivalent to R's `forecast` or Python's `statsmodels`. Anyone doing time series work in Haskell today has to either call out to R or Python via FFI, or implement everything themselves. This is unfortunate!
 
 Sibyl sits as a domain-specific analysis layer on top of [`dataframe`](https://hackage.haskell.org/package/dataframe): load tabular data with `dataframe`, pull a column into a `TimeSeries`, fit a model, and get results back as a `DataFrame` for export or plotting. The workflow mirrors how R's ecosystem is structured: `dataframe` is to `dplyr` what Sibyl is to `forecast`.
 
@@ -30,9 +30,9 @@ Sibyl is built around three principles:
 
 **Be easy to use.** Sibyl keeps similar names to R/Python functions (`predict`, `summarize`, `fit`) and implements similar algorithms. Statisticians familiar with R should feel right at home. `import Sibyl` gives you a notebook-friendly facade that throws on failure rather than returning `Either`, just like R. For production pipelines, import individual modules like `Sibyl.Safe.TimeSeries` or `Sibyl.Models.ARIMA` directly for full error handling.
 
-**Fail loudly and correctly.** R tends to fail in hard-to-debug, silent ways -- NA propagation being the most infamous example. Sibyl enforces validation at construction time via smart constructors (`mkTimeSeries`), so bad data doesn't make it far enough to cause silent downstream failures.
+**Fail loudly and correctly.** R tends to fail in hard-to-debug, silent ways, with NA propagation being the most infamous example. Sibyl enforces validation at construction time via smart constructors (`mkTimeSeries`), so bad data doesn't make it far enough to cause silent downstream failures.
 
-**Allow for extensibility.** Core types and functions are exposed so you can bring your own model. The `Model` typeclass is indexed by a `ModelFamily` kind (via `DataKinds`), with associated type families for `Settings` and `Future` inputs. Self-contained models set `Future` to `()`; models with exogenous regressors like SARIMAX set it to `RegressorMatrix`. Adding a new model means adding a constructor to `ModelFamily`, a `data instance` for the fitted model, and a `Model` instance -- and it integrates with the existing framework and DataFrame exports automatically.
+**Allow for extensibility.** Core types and functions are exposed so you can bring your own model. The `Model` typeclass is indexed by a `ModelFamily` kind (via `DataKinds`), with associated type families for `Settings` and `Future` inputs. Self-contained models set `Future` to `()`; models with exogenous regressors like SARIMAX set it to `RegressorMatrix`. Adding a new model means adding a constructor to `ModelFamily`, a `data instance` for the fitted model, and a `Model` instance, and it integrates with the existing framework and DataFrame exports automatically.
 
 ---
 

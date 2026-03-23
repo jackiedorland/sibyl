@@ -15,8 +15,8 @@ import Sibyl.Model
   , Prediction(..), Summary(..), FitError(..)
   , TrainingSummary(..), ErrorMeasures(..)
   )
-import Sibyl.Safe.TimeSeries (TimeSeries, Period, observations, tsEnd, tsStart, tsLength)
-import Sibyl.TimeSeries (mkTimeSeries)
+import Sibyl.TimeSeries (TimeSeries, Period, observations, tsEnd, tsStart, tsLength)
+import Sibyl (mkTimeSeries)
 
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Either (fromRight)

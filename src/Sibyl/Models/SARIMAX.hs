@@ -5,7 +5,7 @@
 module Sibyl.Models.SARIMAX where
 
 import qualified Data.Vector.Unboxed as U
-import Sibyl.Safe.TimeSeries (TimeSeries)
+import Sibyl.TimeSeries (TimeSeries)
 import Sibyl.Model (ModelFamily(..), Model(..), Fitted, FitError(..), IC, RegressorMatrix, Prediction, Summary)
 
 type PDQ  = (Int, Int, Int)
