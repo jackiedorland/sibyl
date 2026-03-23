@@ -5,13 +5,6 @@
 
 packages:
 - completed:
-    hackage: dataframe-0.7.0.0@sha256:06aa53b287ac5e1d7afa1f03e8ab08f410e3cc91057e41f28db1b449ab40912a,9859
-    pantry-tree:
-      sha256: acb677d8d0d3150b116063eae80cf88e162f08c895f644d6106c9b6932ca8fb8
-      size: 14231
-  original:
-    hackage: dataframe-0.7.0.0@sha256:06aa53b287ac5e1d7afa1f03e8ab08f410e3cc91057e41f28db1b449ab40912a,9859
-- completed:
     hackage: granite-0.4.0.0@sha256:c31937620e57d68ac0645cddab6b5640a43481a8eb053f08fb0ec4ce87998a35,2101
     pantry-tree:
       sha256: 0926d9908bf07feee70b224fbe835c96b0dc941f9379b11ffe55d1b35ee13a69
@@ -25,10 +18,23 @@ packages:
       size: 364
   original:
     hackage: snappy-hs-0.1.0.5@sha256:c2bdac6f5ac1bd8e935e18f43ecaefcbc2b6b2e919cfbc1ea04cac0799348958,1834
+- completed:
+    hackage: dataframe-1.0.0.0@sha256:970b4ef63a7fe28755798002d8184da18d7bc2fdc0a1433fd85779e4170ca059,11127
+    pantry-tree:
+      sha256: 02b31d8de7d180aaa6968387314a598e613df975f0d2d444f59790572bcbb320
+      size: 15957
+  original:
+    hackage: dataframe-1.0.0.0@sha256:970b4ef63a7fe28755798002d8184da18d7bc2fdc0a1433fd85779e4170ca059,11127
+- completed:
+    hackage: random-1.3.1@sha256:0b4f649c3e78713b2ccad1535251ee34b148237fb2229d7058c2b1d9ccc324b8,6004
+    pantry-tree:
+      sha256: 9e92209c00b0c00b7d1c503e15a27b67b74ac2e3b48269a9255893b06de6836c
+      size: 1667
+  original:
+    hackage: random-1.3.1
 snapshots:
 - completed:
-    sha256: a8cfaae441160430cdde558cb80d4f9d60746e7417b275250e4e0af57ee14f36
-    size: 728954
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/33.yaml
-  original:
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/33.yaml
+    sha256: 4d196b02eb766d92e462f1da7b72c0ded25dbec910ac74746bf179cfcceb3811
+    size: 733116
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2026/3/16.yaml
+  original: nightly-2026-03-16

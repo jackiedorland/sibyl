@@ -1,8 +1,17 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Sibyl.TimeSeries where
 
 import qualified Data.Vector.Unboxed as U
+import qualified DataFrame as D
+import DataFrame (DataFrame, DataFrameException)
+import DataFrame.Internal.Column (Columnable)
+import qualified DataFrame.Functions as F
+import Data.Bifunctor (first)
 import Prelude hiding (drop)
 import Sibyl.Internal.Util
+import qualified Data.Text as T
 
 -- * Error Types
 
@@ -19,6 +28,12 @@ data TimeSeriesError
   | InvalidQuantity
   | InsufficientObservations
   deriving (Show, Eq)
+
+data ConversionError
+  = ColumnNotFound T.Text
+  | ColumnTypeMismatch T.Text
+  | InvalidSeries TimeSeriesError
+  | DataFrameError DataFrameException
 
 -- * Unboxed Time Series
 
@@ -238,3 +253,20 @@ diff ts
   where
     timeIndex = index ts
     n = U.length timeIndex
+
+toFromDFExcept :: U.Unbox a => Either DataFrameException a -> Either ConversionError a
+toFromDFExcept = first DataFrameError
+
+fromDataFrame :: forall t. (Columnable t, U.Unbox t)
+              => T.Text -> T.Text -> DataFrame -> Either ConversionError (TimeSeries t Double)
+fromDataFrame colA colB df = do
+  indexV <- toFromDFExcept $ D.columnAsUnboxedVector (D.col @t colA) df
+  obsV   <- toFromDFExcept $ D.columnAsDoubleVector  (D.col @Double colB) df -- TODO: change to castWith when DataFrame compiles on my stack version (weird pragma B.S.)
+  first InvalidSeries $ mkTimeSeries indexV obsV
+
+toDataFrame   :: (U.Unbox t, U.Unbox y) 
+              => TimeSeries t y -> DataFrame
+toDataFrame ts = D.fromNamedColumns
+  [ (T.pack $ "index",        D.fromUnboxedVector (index ts))
+  , (T.pack $ "observations", D.fromUnboxedVector (observations ts))
+  ]

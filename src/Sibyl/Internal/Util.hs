@@ -3,8 +3,6 @@ module Sibyl.Internal.Util where
 
 import qualified Data.Vector.Unboxed as U
 
-type Text = String
-
 strictlyIncreasing :: (U.Unbox a, Ord a) => U.Vector a -> Bool
 strictlyIncreasing v
         | U.length v < 2 = True

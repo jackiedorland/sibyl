@@ -17,8 +17,7 @@
 #
 # snapshot: ./custom-snapshot.yaml
 # snapshot: https://example.com/snapshots/2024-01-01.yaml
-snapshot:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/33.yaml
+snapshot: nightly-2026-03-16
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -31,6 +30,7 @@ snapshot:
 #   - wai
 packages:
 - .
+
 # Dependency packages to be pulled from upstream that are not in the snapshot.
 # These entries can reference officially published versions as well as
 # forks / in-progress versions pinned to a git hash. For example:
@@ -41,9 +41,11 @@ packages:
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
 #
 extra-deps:
-  - dataframe-0.7.0.0@sha256:06aa53b287ac5e1d7afa1f03e8ab08f410e3cc91057e41f28db1b449ab40912a,9859
   - granite-0.4.0.0@sha256:c31937620e57d68ac0645cddab6b5640a43481a8eb053f08fb0ec4ce87998a35,2101
   - snappy-hs-0.1.0.5@sha256:c2bdac6f5ac1bd8e935e18f43ecaefcbc2b6b2e919cfbc1ea04cac0799348958,1834
+  - dataframe-1.0.0.0@sha256:970b4ef63a7fe28755798002d8184da18d7bc2fdc0a1433fd85779e4170ca059,11127
+  - random-1.3.1
+  
 # Override default flag values for project packages and extra-deps
 # flags: {}
 
