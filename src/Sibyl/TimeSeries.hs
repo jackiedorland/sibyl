@@ -8,10 +8,12 @@ import qualified DataFrame as D
 import DataFrame (DataFrame, DataFrameException)
 import DataFrame.Internal.Column (Columnable)
 import qualified DataFrame.Functions as F
+import Control.Monad (foldM)
 import Data.Bifunctor (first)
 import Prelude hiding (drop)
 import Sibyl.Internal.Util
 import qualified Data.Text as T
+import qualified Statistics.Sample as Sm
 
 -- * Error Types
 
@@ -254,6 +256,91 @@ diff ts
     timeIndex = index ts
     n = U.length timeIndex
 
+-- | Applies 'diff' @k@ times, dropping the first @k@ values from the index.
+-- @k < 0@ returns 'InvalidQuantity'; @k == 0@ returns the series unchanged.
+diffN :: (Num y, U.Unbox t, U.Unbox y) => Int -> TimeSeries t y -> Either TimeSeriesError (TimeSeries t y)
+diffN k ts
+  | k < 0     = Left InvalidQuantity
+  | k == 0    = Right ts
+  | otherwise = foldM (\acc _ -> diff acc) ts [1..k]
+
+-- | Seasonal differencing with period @m@: computes @y_t - y_{t-m}@.
+-- Output length is @n - m@; the first @m@ index entries are dropped.
+-- Requires @m >= 1@ and at least @m + 1@ observations.
+diffSeasonal :: (Num y, U.Unbox t, U.Unbox y) => Int -> TimeSeries t y -> Either TimeSeriesError (TimeSeries t y)
+diffSeasonal m ts
+  | m < 1     = Left InvalidQuantity
+  | n <= m    = Left InsufficientObservations
+  | otherwise = Right ts
+      { index        = U.drop m timeIndex
+      , observations = U.zipWith (-) (U.drop m obs) (U.take (n - m) obs)
+      }
+  where
+    timeIndex = index ts
+    obs       = observations ts
+    n         = U.length timeIndex
+
+-- | Applies 'diffSeasonal' @k@ times with the same period @m@.
+-- @k < 0@ returns 'InvalidQuantity'; @k == 0@ returns the series unchanged.
+diffSeasonalN :: (Num y, U.Unbox t, U.Unbox y) => Int -> Int -> TimeSeries t y -> Either TimeSeriesError (TimeSeries t y)
+diffSeasonalN k m ts
+  | k < 0     = Left InvalidQuantity
+  | k == 0    = Right ts
+  | otherwise = foldM (\acc _ -> diffSeasonal m acc) ts [1..k]
+
+-- | Applies @f@ to each trailing window of size @k@, producing a series of length @n - k + 1@.
+-- The output index aligns to the last observation in each window.
+rolling :: (U.Unbox t, U.Unbox y, U.Unbox b)
+        => Int
+        -> (U.Vector y -> b)
+        -> TimeSeries t y
+        -> Either TimeSeriesError (TimeSeries t b)
+rolling k f ts
+  | k <= 0    = Left InvalidQuantity
+  | k > n     = Left InvalidQuantity
+  | otherwise = Right TimeSeries
+      { index        = U.drop (k - 1) (index ts)
+      , observations = U.generate (n - k + 1) (f . window)
+      }
+  where
+    obs    = observations ts
+    n      = U.length obs
+    window i = U.slice i k obs
+
+-- | Rolling arithmetic mean over a trailing window of size @k@.
+rollingMean :: U.Unbox t => Int -> TimeSeries t Double -> Either TimeSeriesError (TimeSeries t Double)
+rollingMean k = rolling k Sm.mean
+
+-- | Rolling sample variance over a trailing window of size @k@.
+rollingVariance :: U.Unbox t => Int -> TimeSeries t Double -> Either TimeSeriesError (TimeSeries t Double)
+rollingVariance k = rolling k Sm.varianceUnbiased
+
+-- | Rolling sample standard deviation over a trailing window of size @k@.
+rollingStdDev :: U.Unbox t => Int -> TimeSeries t Double -> Either TimeSeriesError (TimeSeries t Double)
+rollingStdDev k = rolling k Sm.stdDev
+
+-- | Rolling sum over a trailing window of size @k@.
+rollingSum :: (U.Unbox t, Num y, U.Unbox y) => Int -> TimeSeries t y -> Either TimeSeriesError (TimeSeries t y)
+rollingSum k = rolling k U.sum
+
+-- | Rolling minimum over a trailing window of size @k@.
+rollingMin :: (U.Unbox t, Ord y, U.Unbox y) => Int -> TimeSeries t y -> Either TimeSeriesError (TimeSeries t y)
+rollingMin k = rolling k U.minimum
+
+-- | Rolling maximum over a trailing window of size @k@.
+rollingMax :: (U.Unbox t, Ord y, U.Unbox y) => Int -> TimeSeries t y -> Either TimeSeriesError (TimeSeries t y)
+rollingMax k = rolling k U.maximum
+
+-- | Rolling median over a trailing window of size @k@.
+-- Unlike the aggregations above, this sorts each window in O(k log k) per step.
+rollingMedian :: U.Unbox t => Int -> TimeSeries t Double -> Either TimeSeriesError (TimeSeries t Double)
+rollingMedian = undefined
+
+-- | Rolling Pearson correlation between two series over a trailing window of size @k@.
+-- Both series must have the same index.
+rollingCorr :: U.Unbox t => Int -> TimeSeries t Double -> TimeSeries t Double -> Either TimeSeriesError (TimeSeries t Double)
+rollingCorr = undefined
+
 toFromDFExcept :: Either DataFrameException a -> Either ConversionError a
 toFromDFExcept = first DataFrameError
 
@@ -267,6 +354,6 @@ fromDataFrame colA colB df = do
 toDataFrame   :: (Columnable t, Columnable y, U.Unbox t, U.Unbox y)
               => TimeSeries t y -> DataFrame
 toDataFrame ts = D.fromNamedColumns
-  [ (T.pack $ "index",        D.fromUnboxedVector (index ts))
-  , (T.pack $ "observations", D.fromUnboxedVector (observations ts))
+  [ (T.pack "index",        D.fromUnboxedVector (index ts))
+  , (T.pack "observations", D.fromUnboxedVector (observations ts))
   ]

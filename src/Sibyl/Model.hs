@@ -31,6 +31,7 @@ data ModelFamily
   | Theta
   | TBATS
   | NNETAR
+  | HoltWinters
 
 data family Fitted (mdl :: ModelFamily) idx
 

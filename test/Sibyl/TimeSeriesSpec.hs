@@ -5,6 +5,7 @@ import Test.Hspec
 import Test.QuickCheck
 import qualified Data.Vector.Unboxed as U
 import Sibyl
+import qualified Sibyl.TimeSeries as TS
 
 -- sorry i know this isn't very Haskelly but I prefer it - jackie
 (???) :: (HasCallStack, Show a, Eq a) => a -> a -> Expectation 
@@ -143,6 +144,66 @@ spec = do
     it "rejects series with same length but different indices" $ do
       let shiftedTs = sampleTs { index = U.fromList [10..17 :: Int] }
       evaluate (zipWithSeries (+) sampleTs shiftedTs) `shouldThrow` errorCall "zipWithSeries: IndexMismatch"
+
+  describe "diffN" $ do
+    it "diffN 0 returns the series unchanged" $ do
+      TS.diffN 0 sampleTs `shouldBe` Right sampleTs
+
+    it "diffN 1 equals diff" $ do
+      TS.diffN 1 sampleTs `shouldBe` Right (diff sampleTs)
+
+    it "diffN 2 equals diff applied twice" $ do
+      TS.diffN 2 sampleTs `shouldBe` Right (diff (diff sampleTs))
+
+    it "diffN negative returns InvalidQuantity" $ do
+      TS.diffN (-1) sampleTs `shouldBe` Left TS.InvalidQuantity
+
+    it "diffN k too large returns InsufficientObservations" $ do
+      -- sampleTs has 8 obs; diff 8 times leaves nothing
+      TS.diffN 8 sampleTs `shouldBe` Left TS.InsufficientObservations
+
+  describe "diffSeasonal" $ do
+    it "computes y_t - y_{t-m} for period 2" $ do
+      -- obs: [0,1,2,3,4], period 2 -> [2-0, 3-1, 4-2] = [2,2,2]
+      let ts = mkTimeSeries (U.fromList [1..5 :: Int]) (U.fromList [0,1,2,3,4 :: Double])
+      case TS.diffSeasonal 2 ts of
+        Left err  -> expectationFailure (show err)
+        Right out -> do
+          observations out ??? U.fromList [2.0, 2.0, 2.0]
+          index out        ??? U.fromList [3, 4, 5]
+
+    it "removes a constant seasonal pattern" $ do
+      -- period-4 constant season: [1,2,3,4,1,2,3,4] -> all zeros
+      let ts = mkTimeSeries (U.fromList [1..8 :: Int]) (U.fromList [1,2,3,4,1,2,3,4 :: Double])
+      case TS.diffSeasonal 4 ts of
+        Left err  -> expectationFailure (show err)
+        Right out -> observations out ??? U.replicate 4 0.0
+
+    it "output length is n - m" $ do
+      case TS.diffSeasonal 3 sampleTs of
+        Left err  -> expectationFailure (show err)
+        Right out -> tsLength out ??? tsLength sampleTs - 3
+
+    it "rejects m < 1" $ do
+      TS.diffSeasonal 0 sampleTs `shouldBe` Left TS.InvalidQuantity
+
+    it "rejects n <= m" $ do
+      -- sampleTs has 8 obs; m=8 means no output
+      TS.diffSeasonal 8 sampleTs `shouldBe` Left TS.InsufficientObservations
+
+  describe "diffSeasonalN" $ do
+    it "diffSeasonalN 0 returns the series unchanged" $ do
+      TS.diffSeasonalN 0 4 sampleTs `shouldBe` Right sampleTs
+
+    it "diffSeasonalN 1 equals diffSeasonal" $ do
+      TS.diffSeasonalN 1 3 sampleTs `shouldBe` TS.diffSeasonal 3 sampleTs
+
+    it "diffSeasonalN 2 equals diffSeasonal applied twice" $ do
+      let step1 = TS.diffSeasonal 2 sampleTs
+      TS.diffSeasonalN 2 2 sampleTs `shouldBe` (step1 >>= TS.diffSeasonal 2)
+
+    it "rejects negative k" $ do
+      TS.diffSeasonalN (-1) 4 sampleTs `shouldBe` Left TS.InvalidQuantity
 
 uniqueSorted :: [Int] -> [Int]
 uniqueSorted = dedup . quicksort

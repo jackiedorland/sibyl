@@ -47,8 +47,8 @@ Sibyl is built around three principles:
 - [x] Lag and lead
 - [x] First-order differencing
 - [x] Slicing, `takeFirst`, `takeLast`, `zipWithSeries`
-- [ ] Higher-order and seasonal differencing
-- [ ] Rolling / sliding window operations
+- [x] Higher-order and seasonal differencing
+- [x] Rolling / sliding window operations (TODO: wire to unsafe layer)
 
 **Forecasting & Models**
 - [x] Naive forecasting (Last, Mean, Drift, Seasonal) with prediction intervals
@@ -82,11 +82,15 @@ Progress is tracked on [GitHub Projects](https://github.com/jackiedorland/sibyl/
 
 ### Building
 
-Sibyl targets GHC 9.8 via Stackage LTS 24.33.
+Sibyl targets GHC >=9.6.7.
+
+You will need a `gsl` library installed due to our dependency on `hmatrix-gsl`.
+
+On Fedora, this was accomplished with `sudo dnf install gsl-devel`. 
 
 ```bash
-stack build
-stack test
+cabal build
+cabal test
 ```
 
 ---
