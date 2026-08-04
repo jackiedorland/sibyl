@@ -15,7 +15,7 @@ mae :: U.Vector Double -> Double
 mae resids = Sm.mean $ U.map abs resids
 
 rmse :: U.Vector Double -> Double
-rmse resids = sqrt $ Sm.mean $ U.map (^2) resids
+rmse resids = sqrt $ Sm.mean $ U.map (^ (2 :: Int)) resids
 
 -- | actuals = fitted + residuals; pass both to avoid recomputing
 mape :: U.Vector Double -> U.Vector Double -> Either AccuracyError Double
@@ -27,4 +27,3 @@ mase :: U.Vector Double -> Double -> Either AccuracyError Double
 mase resids scale
     | scale == 0 = Left ConstantTraining
     | otherwise  = Right $ mae resids / scale
-

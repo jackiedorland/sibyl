@@ -1,3 +1,8 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
+
 module Sibyl
   ( module Sibyl.TimeSeries
   , module Sibyl.Model
@@ -10,21 +15,64 @@ module Sibyl
   , lag
   , lead
   , diff
+  , fit
+  , predict
+  , predictWith
   , mae, rmse, mape, mase
   , AccuracyError(..)
+  , NaiveMethod(..)
+  , NaiveSettings(..)
+  , defaultNaiveSettings
+  , fitNaive
+  , fitNaiveWith
+  , forecastNaive
   , TS
   ) where
 
 import Sibyl.TimeSeries hiding (mkTimeSeries, zipWithSeries, slice, takeLast, takeFirst, drop, lag, lead, diff)
 import qualified Sibyl.TimeSeries as TS
-import Sibyl.Model
+import Sibyl.Model hiding (fit, predict)
+import qualified Sibyl.Model as Model
 import qualified Sibyl.Accuracy as Accuracy
 import Sibyl.Accuracy (mae, rmse, AccuracyError(..))
 import Sibyl.Internal.Util (unsafeFromEither)
+import Sibyl.Models.Naive (NaiveMethod(..), NaiveSettings(..), defaultNaiveSettings)
+import qualified Sibyl.Models.Naive as Naive
 import qualified Data.Vector.Unboxed as U
 import Prelude hiding (drop)
 
 type TS t y = TimeSeries t y
+
+-- | Fits any model from its settings and a training series. Throws on error.
+-- Import "Sibyl.Model" directly to use the checked 'Either' version.
+fit
+  :: (Model mdl, U.Unbox idx)
+  => Settings mdl
+  -> TimeSeries idx Double
+  -> Fitted mdl idx
+fit settings trainingSeries =
+  unsafeFromEither "fit" (Model.fit settings trainingSeries)
+
+-- | Predicts from a model that does not need future regressors. Throws on
+-- error. This is the notebook forecasting operation.
+predict
+  :: (Model mdl, Future mdl ~ (), Ord idx, Enum idx, U.Unbox idx)
+  => Int
+  -> Fitted mdl idx
+  -> Prediction idx
+predict horizon fittedModel =
+  unsafeFromEither "predict" (Model.predict horizon () fittedModel)
+
+-- | Predicts from a model with explicit future inputs, such as future
+-- regressors. Throws on error.
+predictWith
+  :: (Model mdl, Ord idx, Enum idx, U.Unbox idx)
+  => Int
+  -> Future mdl
+  -> Fitted mdl idx
+  -> Prediction idx
+predictWith horizon future fittedModel =
+  unsafeFromEither "predictWith" (Model.predict horizon future fittedModel)
 
 -- | Produces a `TimeSeries` from its inputs and enforces invariants. Throws on error.
 mkTimeSeries :: (Ord t, U.Unbox t, U.Unbox y) => U.Vector t -> U.Vector y -> TimeSeries t y
@@ -67,3 +115,22 @@ mape resids acts = unsafeFromEither "mape" (Accuracy.mape resids acts)
 
 mase :: U.Vector Double -> Double -> Double
 mase resids scale = unsafeFromEither "mase" (Accuracy.mase resids scale)
+
+-- | Fits the default naive model. Throws on validation failure.
+-- Import "Sibyl.Models.Naive" directly for the checked 'Either' API.
+fitNaive :: U.Unbox idx => TimeSeries idx Double -> Fitted 'Naive idx
+fitNaive ts = unsafeFromEither "fitNaive" (Naive.fitNaive ts)
+
+-- | Fits a configured naive model. Throws on validation failure.
+fitNaiveWith :: U.Unbox idx => NaiveSettings -> TimeSeries idx Double -> Fitted 'Naive idx
+fitNaiveWith settings ts =
+  unsafeFromEither "fitNaiveWith" (Naive.fitNaiveWith settings ts)
+
+-- | Forecasts from a fitted naive model. Throws on validation failure.
+forecastNaive
+  :: (Ord idx, Enum idx, U.Unbox idx)
+  => Int
+  -> Fitted 'Naive idx
+  -> Prediction idx
+forecastNaive horizon fittedModel =
+  predict horizon fittedModel

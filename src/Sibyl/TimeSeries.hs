@@ -1,18 +1,55 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE FlexibleContexts #-}
-module Sibyl.TimeSeries where
+module Sibyl.TimeSeries
+  ( TimeSeries
+  , Period
+  , TimeSeriesError(..)
+  , ConversionError(..)
+  , mkTimeSeries
+  , index
+  , observations
+  , sampleTimeSeries
+  , defaultTimeSeries
+  , tsLength
+  , tsStart
+  , tsEnd
+  , mapObservations
+  , mapWithIndex
+  , zipWithSeries
+  , slice
+  , takeLast
+  , takeFirst
+  , drop
+  , lag
+  , lead
+  , diff
+  , diffN
+  , diffSeasonal
+  , diffSeasonalN
+  , rolling
+  , rollingMean
+  , rollingVariance
+  , rollingStdDev
+  , rollingSum
+  , rollingMin
+  , rollingMax
+  , rollingMedian
+  , rollingCorr
+  , fromDataFrame
+  , toDataFrame
+  ) where
 
-import qualified Data.Vector.Unboxed as U
-import qualified DataFrame as D
-import DataFrame (DataFrame, DataFrameException)
-import DataFrame.Internal.Column (Columnable)
-import qualified DataFrame.Functions as F
 import Control.Monad (foldM)
 import Data.Bifunctor (first)
-import Prelude hiding (drop)
-import Sibyl.Internal.Util
+import Data.List (sort)
 import qualified Data.Text as T
+import qualified Data.Vector.Unboxed as U
+import DataFrame (DataFrame, DataFrameException)
+import qualified DataFrame as D
+import DataFrame.Internal.Column (Columnable)
+import Prelude hiding (drop)
+import Sibyl.Internal.Util (strictlyIncreasing)
 import qualified Statistics.Sample as Sm
 
 -- * Error Types
@@ -29,6 +66,7 @@ data TimeSeriesError
   | InvalidSlice
   | InvalidQuantity
   | InsufficientObservations
+  | UndefinedCorrelation
   deriving (Show, Eq)
 
 data ConversionError
@@ -36,6 +74,7 @@ data ConversionError
   | ColumnTypeMismatch T.Text
   | InvalidSeries TimeSeriesError
   | DataFrameError DataFrameException
+  deriving (Show)
 
 -- * Unboxed Time Series
 
@@ -55,8 +94,8 @@ data ConversionError
 -- This type does not have a 'Functor' instance because mapping over unboxed vectors
 -- requires additional 'U.Unbox' constraints on output types.
 data TimeSeries t y = TimeSeries
-  { index        :: !(U.Vector t)   -- ^ Strictly increasing index of any ordered type.
-  , observations :: !(U.Vector y)   -- ^ Values (observations) aligned 1:1 with 'index'
+  { timeSeriesIndex        :: !(U.Vector t)
+  , timeSeriesObservations :: !(U.Vector y)
   } deriving (Eq, Show)
 
 type Period = Int
@@ -80,15 +119,14 @@ mkTimeSeries idx values
     ilen = U.length idx
     vlen = U.length values
 
--- | Splits a 'SeasonalSeries' into full-season chunks. Trailing incomplete season is dropped.
-seasonSlices :: (U.Unbox t, U.Unbox y) => Int -> TimeSeries t y -> [TimeSeries t y]
-seasonSlices m ss =
-  [ TimeSeries (U.slice (i * m) m idx) (U.slice (i * m) m obs)
-  | i <- [0 .. fullSeasons - 1] ]
-  where
-    idx         = index ss
-    obs         = observations ss
-    fullSeasons = U.length obs `div` m
+-- | Returns the time index. The returned immutable vector cannot be used to
+-- mutate the series or violate its construction invariants.
+index :: TimeSeries t y -> U.Vector t
+index = timeSeriesIndex
+
+-- | Returns observations aligned one-to-one with 'index'.
+observations :: TimeSeries t y -> U.Vector y
+observations = timeSeriesObservations
 
 -- ** Sample Data
 
@@ -96,9 +134,8 @@ seasonSlices m ss =
 sampleTimeSeries :: TimeSeries Int Double
 sampleTimeSeries =
   TimeSeries
-    { index = U.fromList [1 .. 8]
-    , observations = U.fromList [101.0, 103.0, 102.5, 104.0, 106.0, 105.5, 107.0, 108.0]
-    }
+    (U.fromList [1 .. 8])
+    (U.fromList [101.0, 103.0, 102.5, 104.0, 106.0, 105.5, 107.0, 108.0])
 
 -- | Synonym for `sampleTimeSeries`
 defaultTimeSeries :: TimeSeries Int Double
@@ -133,7 +170,7 @@ mapObservations f = f . observations
 -- | Maps observations with access to the aligned time index.
 mapWithIndex :: (U.Unbox t, U.Unbox y, U.Unbox b) => (t -> y -> b) -> TimeSeries t y -> TimeSeries t b
 mapWithIndex f ts =
-  ts { observations = U.zipWith f (index ts) (observations ts) }
+  TimeSeries (index ts) (U.zipWith f (index ts) (observations ts))
 
 -- ** Combination And Slicing
 
@@ -142,7 +179,7 @@ zipWithSeries :: (Eq t, U.Unbox a, U.Unbox b, U.Unbox c, U.Unbox t) => (a -> b -
 zipWithSeries f tsA tsB
   | lenA /= lenB     = Left LengthMismatch
   | indexA /= indexB = Left IndexMismatch
-  | otherwise        = Right TimeSeries { index = indexA, observations = zipped }
+  | otherwise        = Right (TimeSeries indexA zipped)
   where
     lenA = tsLength tsA
     lenB = tsLength tsB
@@ -157,7 +194,7 @@ slice :: (Ord t, U.Unbox t, U.Unbox y) => t -> t -> TimeSeries t y -> Either Tim
 slice start end ts
   | start > end      = Left InvalidSlice
   | U.null newIndex  = Left EmptySeries
-  | otherwise        = Right ts { index = newIndex, observations = newObs }
+  | otherwise        = Right (TimeSeries newIndex newObs)
   where
     timeIndex = index ts
     obs = observations ts
@@ -172,7 +209,7 @@ takeLast k ts
   | k < 0            = Left InvalidQuantity
   | k > n            = Left InvalidQuantity
   | U.null newIndex  = Left EmptySeries
-  | otherwise        = Right ts { index = newIndex, observations = newObs }
+  | otherwise        = Right (TimeSeries newIndex newObs)
   where
     timeIndex = index ts
     obs = observations ts
@@ -186,7 +223,7 @@ takeFirst k ts
   | k < 0            = Left InvalidQuantity
   | k > n            = Left InvalidQuantity
   | U.null newIndex  = Left EmptySeries
-  | otherwise        = Right ts { index = newIndex, observations = newObs }
+  | otherwise        = Right (TimeSeries newIndex newObs)
   where
     timeIndex = index ts
     obs = observations ts
@@ -200,7 +237,7 @@ drop k ts
   | k < 0            = Left InvalidQuantity
   | k > n            = Left InvalidQuantity
   | U.null newIndex  = Left EmptySeries
-  | otherwise        = Right ts { index = newIndex, observations = newObs }
+  | otherwise        = Right (TimeSeries newIndex newObs)
   where
     timeIndex = index ts
     obs = observations ts
@@ -217,10 +254,9 @@ lag k ts
   | U.null timeIndex          = Left EmptySeries
   | k < 0                     = Left InvalidLag
   | k >= n                    = Left InvalidLag
-  | otherwise                 = Right ts
-      { index = U.drop k timeIndex
-      , observations = U.take (n - k) obs
-      }
+  | otherwise                 = Right (TimeSeries
+      (U.drop k timeIndex)
+      (U.take (n - k) obs))
   where
     timeIndex = index ts
     obs = observations ts
@@ -233,10 +269,9 @@ lead k ts
   | U.null timeIndex          = Left EmptySeries
   | k < 0                     = Left InvalidLead
   | k >= n                    = Left InvalidLead
-  | otherwise                 = Right ts
-      { index = U.take (n - k) timeIndex
-      , observations = U.drop k obs
-      }
+  | otherwise                 = Right (TimeSeries
+      (U.take (n - k) timeIndex)
+      (U.drop k obs))
   where
     timeIndex = index ts
     obs = observations ts
@@ -248,10 +283,9 @@ diff :: (Num y, U.Unbox t, U.Unbox y) => TimeSeries t y -> Either TimeSeriesErro
 diff ts
   | U.null timeIndex         = Left EmptySeries
   | n == 1                   = Left InsufficientObservations
-  | otherwise                = Right ts
-      { index = U.drop 1 timeIndex
-      , observations = U.zipWith (-) (U.drop 1 (observations ts)) (observations ts) -- y' = y_t - y_(t-1)
-      }
+  | otherwise                = Right (TimeSeries
+      (U.drop 1 timeIndex)
+      (U.zipWith (-) (U.drop 1 (observations ts)) (observations ts))) -- y' = y_t - y_(t-1)
   where
     timeIndex = index ts
     n = U.length timeIndex
@@ -271,10 +305,9 @@ diffSeasonal :: (Num y, U.Unbox t, U.Unbox y) => Int -> TimeSeries t y -> Either
 diffSeasonal m ts
   | m < 1     = Left InvalidQuantity
   | n <= m    = Left InsufficientObservations
-  | otherwise = Right ts
-      { index        = U.drop m timeIndex
-      , observations = U.zipWith (-) (U.drop m obs) (U.take (n - m) obs)
-      }
+  | otherwise = Right (TimeSeries
+      (U.drop m timeIndex)
+      (U.zipWith (-) (U.drop m obs) (U.take (n - m) obs)))
   where
     timeIndex = index ts
     obs       = observations ts
@@ -298,10 +331,9 @@ rolling :: (U.Unbox t, U.Unbox y, U.Unbox b)
 rolling k f ts
   | k <= 0    = Left InvalidQuantity
   | k > n     = Left InvalidQuantity
-  | otherwise = Right TimeSeries
-      { index        = U.drop (k - 1) (index ts)
-      , observations = U.generate (n - k + 1) (f . window)
-      }
+  | otherwise = Right (TimeSeries
+      (U.drop (k - 1) (index ts))
+      (U.generate (n - k + 1) (f . window)))
   where
     obs    = observations ts
     n      = U.length obs
@@ -313,11 +345,15 @@ rollingMean k = rolling k Sm.mean
 
 -- | Rolling sample variance over a trailing window of size @k@.
 rollingVariance :: U.Unbox t => Int -> TimeSeries t Double -> Either TimeSeriesError (TimeSeries t Double)
-rollingVariance k = rolling k Sm.varianceUnbiased
+rollingVariance k
+  | k < 2     = const (Left InvalidQuantity)
+  | otherwise = rolling k Sm.varianceUnbiased
 
 -- | Rolling sample standard deviation over a trailing window of size @k@.
 rollingStdDev :: U.Unbox t => Int -> TimeSeries t Double -> Either TimeSeriesError (TimeSeries t Double)
-rollingStdDev k = rolling k Sm.stdDev
+rollingStdDev k
+  | k < 2     = const (Left InvalidQuantity)
+  | otherwise = rolling k Sm.stdDev
 
 -- | Rolling sum over a trailing window of size @k@.
 rollingSum :: (U.Unbox t, Num y, U.Unbox y) => Int -> TimeSeries t y -> Either TimeSeriesError (TimeSeries t y)
@@ -334,12 +370,44 @@ rollingMax k = rolling k U.maximum
 -- | Rolling median over a trailing window of size @k@.
 -- Unlike the aggregations above, this sorts each window in O(k log k) per step.
 rollingMedian :: U.Unbox t => Int -> TimeSeries t Double -> Either TimeSeriesError (TimeSeries t Double)
-rollingMedian = undefined
+rollingMedian k = rolling k median
+  where
+    median values =
+      let sorted = sort (U.toList values)
+          n = length sorted
+          midpoint = n `div` 2
+      in if odd n
+           then sorted !! midpoint
+           else (sorted !! (midpoint - 1) + sorted !! midpoint) / 2
 
 -- | Rolling Pearson correlation between two series over a trailing window of size @k@.
 -- Both series must have the same index.
-rollingCorr :: U.Unbox t => Int -> TimeSeries t Double -> TimeSeries t Double -> Either TimeSeriesError (TimeSeries t Double)
-rollingCorr = undefined
+rollingCorr :: (Eq t, U.Unbox t) => Int -> TimeSeries t Double -> TimeSeries t Double -> Either TimeSeriesError (TimeSeries t Double)
+rollingCorr k tsA tsB
+  | index tsA /= index tsB = Left IndexMismatch
+  | k < 2                  = Left InvalidQuantity
+  | k > n                  = Left InvalidQuantity
+  | otherwise = do
+      correlations <- traverse correlationAt [0 .. n - k]
+      Right (TimeSeries (U.drop (k - 1) (index tsA)) (U.fromList correlations))
+  where
+    n = tsLength tsA
+    obsA = observations tsA
+    obsB = observations tsB
+
+    correlationAt offset =
+      let windowA = U.slice offset k obsA
+          windowB = U.slice offset k obsB
+          meanA = Sm.mean windowA
+          meanB = Sm.mean windowB
+          centeredA = U.map (subtract meanA) windowA
+          centeredB = U.map (subtract meanB) windowB
+          numerator = U.sum (U.zipWith (*) centeredA centeredB)
+          denominator = sqrt (U.sum (U.map (^ (2 :: Int)) centeredA)
+                            * U.sum (U.map (^ (2 :: Int)) centeredB))
+      in if denominator == 0
+           then Left UndefinedCorrelation
+           else Right (numerator / denominator)
 
 toFromDFExcept :: Either DataFrameException a -> Either ConversionError a
 toFromDFExcept = first DataFrameError

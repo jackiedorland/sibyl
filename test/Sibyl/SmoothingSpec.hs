@@ -2,7 +2,7 @@ module Sibyl.SmoothingSpec (spec) where
 
 import Test.Hspec
 import qualified Data.Vector.Unboxed as U
-import Sibyl.TimeSeries (TimeSeries(..), sampleTimeSeries, index, observations)
+import Sibyl.TimeSeries (TimeSeries, index, mkTimeSeries, observations, sampleTimeSeries)
 import Sibyl.Smoothing (sma, ses, sesManual, SmoothingError(..))
 
 spec :: Spec
@@ -10,25 +10,25 @@ spec = do
   describe "sma" $ do
 
     it "produces correct window means for k=3" $ do
-      let ts = TimeSeries (U.fromList [1,2,3,4,5 :: Int]) (U.fromList [1,2,3,4,5 :: Double])
+      let ts = fixture [1,2,3,4,5] [1,2,3,4,5]
       case sma 3 ts of
         Left err  -> expectationFailure (show err)
         Right out -> observations out `shouldBe` U.fromList [2.0, 3.0, 4.0]
 
     it "aligns output index to the last observation in each window" $ do
-      let ts = TimeSeries (U.fromList [1,2,3,4,5 :: Int]) (U.fromList [1,2,3,4,5 :: Double])
+      let ts = fixture [1,2,3,4,5] [1,2,3,4,5]
       case sma 3 ts of
         Left err  -> expectationFailure (show err)
         Right out -> index out `shouldBe` U.fromList [3, 4, 5]
 
     it "k=1 returns the original observations unchanged" $ do
-      let ts = TimeSeries (U.fromList [1,2,3 :: Int]) (U.fromList [10,20,30 :: Double])
+      let ts = fixture [1,2,3] [10,20,30]
       case sma 1 ts of
         Left err  -> expectationFailure (show err)
         Right out -> observations out `shouldBe` observations ts
 
     it "k=n returns a single point equal to the global mean" $ do
-      let ts = TimeSeries (U.fromList [1,2,3,4 :: Int]) (U.fromList [1,2,3,4 :: Double])
+      let ts = fixture [1,2,3,4] [1,2,3,4]
       case sma 4 ts of
         Left err  -> expectationFailure (show err)
         Right out -> do
@@ -45,13 +45,13 @@ spec = do
   describe "sesManual" $ do
 
     it "produces correct level sequence against a handcrafted example" $ do
-      let ts = TimeSeries (U.fromList [1,2,3 :: Int]) (U.fromList [10,20,30 :: Double])
+      let ts = fixture [1,2,3] [10,20,30]
       case sesManual 0.5 ts of
         Left err  -> expectationFailure (show err)
         Right out -> observations out `shouldBe` U.fromList [10.0, 15.0, 22.5]
 
     it "output has the same length and index as the input" $ do
-      let ts = TimeSeries (U.fromList [1,2,3,4 :: Int]) (U.fromList [1,2,3,4 :: Double])
+      let ts = fixture [1,2,3,4] [1,2,3,4]
       case sesManual 0.3 ts of
         Left err  -> expectationFailure (show err)
         Right out -> do
@@ -67,7 +67,7 @@ spec = do
       sesManual 1.5 sampleTimeSeries `shouldBe` Left InvalidAlpha
 
     it "fewer than 2 observations returns InsufficientData" $ do
-      let ts = TimeSeries (U.fromList [1 :: Int]) (U.fromList [42.0 :: Double])
+      let ts = fixture [1] [42]
       sesManual 0.5 ts `shouldBe` Left InsufficientData
 
   describe "ses (auto alpha)" $ do
@@ -101,5 +101,10 @@ spec = do
           sseAuto `shouldSatisfy` (<= sseMid + 1e-6)
 
     it "fewer than 2 observations returns InsufficientData" $ do
-      let ts = TimeSeries (U.fromList [1 :: Int]) (U.fromList [42.0 :: Double])
+      let ts = fixture [1] [42]
       ses ts `shouldBe` Left InsufficientData
+
+fixture :: [Int] -> [Double] -> TimeSeries Int Double
+fixture idx values = case mkTimeSeries (U.fromList idx) (U.fromList values) of
+  Left err -> error ("invalid test fixture: " ++ show err)
+  Right ts -> ts

@@ -19,14 +19,14 @@ spec :: Spec
 spec = do
   describe "mkTimeSeries" $ do
     it "rejects length mismatch" $ do
-      let index = U.fromList [1 :: Int, 2]
+      let idx = U.fromList [1 :: Int, 2]
           values = U.fromList [10.0 :: Double]
-      evaluate (mkTimeSeries index values) `shouldThrow` errorCall "mkTimeSeries: LengthMismatch"
+      evaluate (mkTimeSeries idx values) `shouldThrow` errorCall "mkTimeSeries: LengthMismatch"
 
     it "rejects empty series" $ do
-      let index = U.empty :: U.Vector Int
+      let idx = U.empty :: U.Vector Int
           values = U.empty :: U.Vector Double
-      evaluate (mkTimeSeries index values) `shouldThrow` errorCall "mkTimeSeries: EmptySeries"
+      evaluate (mkTimeSeries idx values) `shouldThrow` errorCall "mkTimeSeries: EmptySeries"
 
   describe "basic invariants" $ do
     it "sampleTimeSeries has aligned index/observation lengths" $ do
@@ -36,18 +36,16 @@ spec = do
       property $ \xs ->
         let indexList = uniqueSorted (map (abs :: Int -> Int) xs)
             valuesList = map fromIntegral indexList :: [Double]
-            index = U.fromList indexList
+            idx = U.fromList indexList
             values = U.fromList valuesList
          in not (null indexList) ==>
-              tsLength (mkTimeSeries index values) === length indexList
+              tsLength (mkTimeSeries idx values) === length indexList
 
   describe "lag tests" $ do 
     it "lag by one period" $ do
       let lagged = lag 1 sampleTs
-      lagged ??? sampleTs
-        { observations = U.take (tsLength sampleTs - 1) (observations sampleTs)
-        , index = U.drop 1 (index sampleTs)
-        }
+      observations lagged ??? U.take (tsLength sampleTs - 1) (observations sampleTs)
+      index lagged ??? U.drop 1 (index sampleTs)
     
     it "rejects -1 lag" $ do
       evaluate (lag (-1) sampleTs) `shouldThrow` errorCall "lag: InvalidLag"
@@ -58,10 +56,8 @@ spec = do
   describe "lead tests" $ do
     it "lead by one period" $ do
       let led = lead 1 sampleTs
-      led ??? sampleTs
-        { observations = U.drop 1 (observations sampleTs)
-        , index = U.take (tsLength sampleTs - 1) (index sampleTs)
-        }
+      observations led ??? U.drop 1 (observations sampleTs)
+      index led ??? U.take (tsLength sampleTs - 1) (index sampleTs)
 
     it "rejects -1 lead" $ do
       evaluate (lead (-1) sampleTs) `shouldThrow` errorCall "lead: InvalidLead"
@@ -142,7 +138,7 @@ spec = do
       evaluate (zipWithSeries (+) sampleTs shorter) `shouldThrow` errorCall "zipWithSeries: LengthMismatch"
 
     it "rejects series with same length but different indices" $ do
-      let shiftedTs = sampleTs { index = U.fromList [10..17 :: Int] }
+      let shiftedTs = mkTimeSeries (U.fromList [10..17 :: Int]) (observations sampleTs)
       evaluate (zipWithSeries (+) sampleTs shiftedTs) `shouldThrow` errorCall "zipWithSeries: IndexMismatch"
 
   describe "diffN" $ do
@@ -204,6 +200,30 @@ spec = do
 
     it "rejects negative k" $ do
       TS.diffSeasonalN (-1) 4 sampleTs `shouldBe` Left TS.InvalidQuantity
+
+  describe "rolling statistics" $ do
+    it "computes rolling medians for odd and even windows" $ do
+      case TS.rollingMedian 3 sampleTs of
+        Left err -> expectationFailure (show err)
+        Right out -> U.head (observations out) `shouldBe` 102.5
+      case TS.rollingMedian 2 sampleTs of
+        Left err -> expectationFailure (show err)
+        Right out -> U.head (observations out) `shouldBe` 102.0
+
+    it "computes rolling Pearson correlation and preserves alignment" $ do
+      case TS.rollingCorr 3 sampleTs sampleTs of
+        Left err -> expectationFailure (show err)
+        Right out -> do
+          index out `shouldBe` U.fromList [3..8]
+          U.all (\value -> abs (value - 1) < 1e-12) (observations out) `shouldBe` True
+
+    it "rejects undefined rolling correlations" $ do
+      let constants = mkTimeSeries (U.fromList [1..4 :: Int]) (U.replicate 4 (1 :: Double))
+      TS.rollingCorr 2 constants constants `shouldBe` Left TS.UndefinedCorrelation
+
+    it "rejects one-observation variance and correlation windows" $ do
+      TS.rollingVariance 1 sampleTs `shouldBe` Left TS.InvalidQuantity
+      TS.rollingCorr 1 sampleTs sampleTs `shouldBe` Left TS.InvalidQuantity
 
 uniqueSorted :: [Int] -> [Int]
 uniqueSorted = dedup . quicksort

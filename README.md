@@ -14,87 +14,133 @@
 
 > *Tell us what the future holds, so we may know that you are gods.*
 
-## A performant, R-style time series analysis library for Haskell.
+## Notebook-friendly, dataframe-oriented forecasting for Haskell
 
-### BE AWARE: Sibyl is in extremely early development. Many features are unimplemented or `= undefined`. 
+Sibyl is designed first for interactive statistical exploration. Import one module, fit a model, predict a horizon, and inspect the result:
 
-### Why Sibyl?
+```haskell
+import Sibyl
 
-Haskell has strong numerical libraries (`statistics`, `hmatrix`, `vector`) but nothing equivalent to R's `forecast` or Python's `statsmodels`. Anyone doing time series work in Haskell today has to either call out to R or Python via FFI, or implement everything themselves. This is unfortunate!
-
-Sibyl sits as a domain-specific analysis layer on top of [`dataframe`](https://hackage.haskell.org/package/dataframe): load tabular data with `dataframe`, pull a column into a `TimeSeries`, fit a model, and get results back as a `DataFrame` for export or plotting. The workflow mirrors how R's ecosystem is structured: `dataframe` is to `dplyr` what Sibyl is to `forecast`.
-
-### Design Philosophy
-
-Sibyl is built around three principles:
-
-**Be easy to use.** Sibyl keeps similar names to R/Python functions (`predict`, `summarize`, `fit`) and implements similar algorithms. Statisticians familiar with R should feel right at home. `import Sibyl` gives you a notebook-friendly facade that throws on failure rather than returning `Either`, just like R. For production pipelines, import individual modules like `Sibyl.Safe.TimeSeries` or `Sibyl.Models.ARIMA` directly for full error handling.
-
-**Fail loudly and correctly.** R tends to fail in hard-to-debug, silent ways. Sibyl enforces validation at construction time via smart constructors (`mkTimeSeries`), so bad data doesn't make it far enough to cause silent downstream failures.
-
-**Allow for extensibility.** Core types and functions are exposed so you can bring your own model. The `Model` typeclass is indexed by a `ModelFamily` kind (via `DataKinds`), with associated type families for `Settings` and `Future` inputs. Self-contained models set `Future` to `()`; models with exogenous regressors like SARIMAX set it to `RegressorMatrix`. Adding a new model means adding a constructor to `ModelFamily`, a `data instance` for the fitted model, and a `Model` instance, and it integrates with the existing framework and DataFrame exports automatically.
-
----
-
-### What's Implemented
-
-**Core Infrastructure**
-- [x] Unsafe timeseries for interactive use (`Sibyl.TimeSeries`)
-- [x] Safe timeseries for production pipelines (`Sibyl.Safe.TimeSeries`)
-- [x] Smart constructors with invariant enforcement (strictly increasing index, equal lengths, non-empty)
-
-**Transformations**
-- [x] Lag and lead
-- [x] First-order differencing
-- [x] Slicing, `takeFirst`, `takeLast`, `zipWithSeries`
-- [x] Higher-order and seasonal differencing
-- [x] Rolling / sliding window operations (TODO: wire to unsafe layer)
-
-**Forecasting & Models**
-- [x] Naive forecasting (Last, Mean, Drift, Seasonal) with prediction intervals
-- [x] Forecast accuracy metrics (MAE, RMSE, MAPE, MASE)
-- [ ] Exponential smoothing (SES, Holt, Holt-Winters, damped trend)
-- [ ] ARIMA with automatic model selection (Hyndman-Khandakar)
-- [ ] Seasonal ARIMA (SARIMA)
-
-**Diagnostics & Decomposition**
-- [ ] ACF and PACF
-- [ ] Ljung-Box test
-- [ ] Classical decomposition (additive / multiplicative)
-- [ ] STL decomposition
-
-**Infrastructure**
-- [ ] DataFrame interop (`fromDataFrame`, `toDataFrame`)
-- [ ] Information criteria (AIC, AICc, BIC)
-- [ ] Time series cross-validation / rolling origin
-
----
-
-### Roadmap
-
-Sibyl is being developed as a new library for the dataHaskell ecosystem. The goal by the end of the Q3 2026 is a complete automatic ARIMA pipeline, with exponential smoothing, classical decomposition, and diagnostics along the way.
-
-The implementation follows the same mathematical foundations as R's `forecast` package, with Hyndman-Khandakar automatic model selection as the primary milestone. Natural next steps include SARIMA, ETS state-space models, and hierarchical forecasting.
-
-Progress is tracked on [GitHub Projects](https://github.com/jackiedorland/sibyl/projects).
-
----
-
-### Building
-
-Sibyl targets GHC >=9.6.7.
-
-You will need a `gsl` library installed due to our dependency on `hmatrix-gsl`.
-
-On Fedora, this was accomplished with `sudo dnf install gsl-devel`. 
-
-```bash
-cabal build
-cabal test
+model = fit defaultNaiveSettings sampleTimeSeries
+forecast = predict 12 model
 ```
 
----
+The notebook facade deliberately reads like R or Python while the underlying direct modules retain checked `Either` results for applications. Sibyl is narrower than a general statistics toolkit: the goal is a coherent R-`forecast`-style workflow that starts and ends with Haskell `DataFrame`s.
 
-### License
+The current `0.0.0.1` surface is a stabilized foundation, not the full vision. Naive forecasting is the only release-ready model family today. ARIMA, Holt-Winters, decomposition, plotting, and dataframe-native grouped workflows remain under development and are not exposed as working features.
+
+## What works now
+
+- Opaque `TimeSeries index value` values with checked construction (non-empty, equal-length vectors and a strictly increasing index).
+- Safe slicing, lag/lead, ordinary and seasonal differencing, and rolling aggregations.
+- Rolling mean, variance, standard deviation, sum, minimum, maximum, median, and Pearson correlation.
+- Simple moving average and manually or automatically tuned single exponential smoothing.
+- Last-value, mean, drift, and seasonal naive forecasts with prediction intervals.
+- Fitted values, residuals, model summaries, and MAE/RMSE/MAPE/MASE.
+- Basic conversion of one index column and one numeric value column to/from `DataFrame`.
+- Generic notebook operations like `fit`, `predict`, `predictWith`, `summarize`, `fitted`, and `residuals`
+
+## Quick start
+
+### Notebook and REPL use
+
+`import Sibyl` is the primary exploration interface.
+
+```haskell
+import qualified Data.Vector.Unboxed as U
+import Sibyl
+
+sales = mkTimeSeries
+  (U.fromList [1..8 :: Int])
+  (U.fromList [10, 20, 30, 40, 12, 22, 32, 42 :: Double])
+
+settings = defaultNaiveSettings
+  { naiveMethod = Seasonal
+  , period = Just 4
+  , naiveCiLevel = 0.95
+  }
+
+model = fit settings sales
+forecast = predict 6 model
+
+forecastValues = observations (predPoint forecast)
+lowerBounds = observations (predLower forecast)
+upperBounds = observations (predUpper forecast)
+
+-- In IO / an IHaskell cell:
+-- summarize model
+```
+
+The central vocabulary is model-independent:
+
+```haskell
+fit         settings series
+predict     horizon model
+predictWith horizon futureData model
+summarize   model
+fitted      model
+residuals   model
+```
+
+`fit` infers the model family from the settings value. `predict` is for models that need no future inputs. `predictWith` supports future regressors or other model-specific future data without complicating the common case.
+
+Model-specific helpers such as `fitNaive` and `forecastNaive` remain as optional conveniences, if you prefer them.
+
+### Safe use
+
+Import direct modules when you need explicit error handling. They expose the same implementation through `Either`:
+
+```haskell
+import Sibyl.Model (Prediction(..))
+import Sibyl.Models.Naive (fitNaive, predictNaive)
+import Sibyl.TimeSeries (index, observations, sampleTimeSeries)
+
+main :: IO ()
+main = case fitNaive sampleTimeSeries >>= predictNaive 3 of
+  Left err -> print err
+  Right prediction -> do
+    print (index (predPoint prediction))
+    print (observations (predPoint prediction))
+```
+
+## DataFrame status
+
+Basic interop exists today:
+
+```haskell
+fromDataFrame :: Text -> Text -> DataFrame -> Either ConversionError (TimeSeries index Double)
+toDataFrame   :: TimeSeries index value -> DataFrame
+```
+
+but this is first priority for the future.
+
+## Modules
+
+- `Sibyl` is the primary notebook/REPL facade with generic `fit` and `predict` operations.
+- `Sibyl.TimeSeries` has checked series construction and transformations.
+- `Sibyl.Smoothing` is moving-average and single-exponential smoothing.
+- `Sibyl.Accuracy` has forecasting accuracy measures.
+- `Sibyl.Model` contains the common fitted-model, prediction, summary, and error types.
+- `Sibyl.Models.Naive` has the "safe" naive model fitting and prediction.
+
+## Near-term roadmap
+
+1. DataFrame 1.1 migration and first-class single/grouped frame workflows.
+2. Forecast frequency/calendar policies that replace implicit `Enum` index extension.
+3. ACF/PACF, Ljung-Box, and reference-value diagnostic tests.
+4. Optimized Holt/Holt-Winters with intervals.
+5. ARIMA/SARIMA/SARIMAX and deterministic automatic order selection.
+6. Rolling-origin cross-validation and accuracy by horizon.
+
+## Building
+
+Sibyl supports GHC 9.6.7 and 9.10.3.
+
+```bash
+cabal build all --enable-tests
+cabal test all
+```
+
+## License
 
 BSD-3-Clause. See [LICENSE](LICENSE).

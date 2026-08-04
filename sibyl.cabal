@@ -9,32 +9,38 @@ author:              Jackie Dorland
 maintainer:          me@jackiedor.land
 copyright:           2026 Jackie Dorland
 category:            Statistics
+synopsis:            Validated, dataframe-oriented time-series forecasting
+description:
+  Sibyl is an early-stage Haskell library for validated, indexed time series
+  and forecasting workflows. The current public release surface includes
+  transformations, smoothing, accuracy metrics, DataFrame conversion, and
+  naive forecasting with prediction intervals.
 build-type:          Simple
+tested-with:         GHC == 9.6.7
+                     GHC == 9.10.3
+extra-doc-files:     CHANGELOG.md
+                     REPORT.md
 extra-source-files:  README.md
-                     CHANGELOG.md
+                     planning/*.md
+                     data/sales.csv
 
 library
   hs-source-dirs:      src
   exposed-modules:     Sibyl
                        Sibyl.TimeSeries
                        Sibyl.Model
-                       Sibyl.Forecast
                        Sibyl.Smoothing
-                       Sibyl.Decomposition
                        Sibyl.Accuracy
-                       Sibyl.Plotting
                        Sibyl.Models.Naive
-                       Sibyl.Models.SARIMAX
-                       Sibyl.Models.HoltWinters
   other-modules:       Sibyl.Internal.Util
   default-language:    Haskell2010
-  build-depends:       base >= 4.7 && < 5,
-                       vector >= 0.13,
-                       statistics >= 0.16,
+  build-depends:       base >= 4.18 && < 5,
+                       vector >= 0.13 && < 0.14,
+                       statistics >= 0.16 && < 0.17,
                        text >= 2.1.3 && < 2.2,
-                       dataframe >= 1.0.0.0 && < 1.1.0.0,
-                       hmatrix == 0.20.2,
-                       hmatrix-gsl >= 0.19
+                       dataframe >= 1.0 && < 1.1,
+                       hgg >= 0.1 && < 0.2,
+                       hgg-rasterific >= 0.1 && < 0.2
   ghc-options:         -Wall
                        -Wcompat
                        -Widentities
@@ -57,14 +63,13 @@ test-suite sibyl-test
   hs-source-dirs:      test
   main-is:             Spec.hs
   other-modules:       Sibyl.AccuracySpec
-                       Sibyl.DecompositionSpec
                        Sibyl.FacadeSpec
-                       Sibyl.PlottingSpec
+                       Sibyl.NaiveSpec
                        Sibyl.SafeTimeSeriesSpec
                        Sibyl.SmoothingSpec
                        Sibyl.TimeSeriesSpec
   default-language:    Haskell2010
-  build-depends:       base >= 4.7 && < 5,
+  build-depends:       base >= 4.18 && < 5,
                        sibyl,
                        hspec >= 2.11,
                        QuickCheck >= 2.14,

@@ -10,12 +10,11 @@ spec = do
     it "builds a valid series" $ do
       let idx = U.fromList [1 :: Int, 2, 3]
           obs = U.fromList [10.0 :: Double, 11.0, 12.0]
-      SafeTS.mkTimeSeries idx obs `shouldBe`
-        Right
-          SafeTS.TimeSeries
-            { SafeTS.index = idx
-            , SafeTS.observations = obs
-            }
+      case SafeTS.mkTimeSeries idx obs of
+        Left err -> expectationFailure (show err)
+        Right ts -> do
+          SafeTS.index ts `shouldBe` idx
+          SafeTS.observations ts `shouldBe` obs
 
     it "gives left for non monotonic index" $ do
       let idx = U.fromList [1 :: Int, 1, 2]

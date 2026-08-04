@@ -6,9 +6,14 @@ module Sibyl.Smoothing
   ) where
 
 import qualified Data.Vector.Unboxed as U
-import Numeric.GSL.Minimization (minimizeV, MinimizeMethod(..))
-import Numeric.LinearAlgebra (Vector, atIndex, fromList)
-import Sibyl.TimeSeries (TimeSeries(..), observations, TimeSeriesError (InvalidQuantity), rolling)
+import Sibyl.TimeSeries
+  ( TimeSeries
+  , TimeSeriesError(InvalidQuantity)
+  , index
+  , mkTimeSeries
+  , observations
+  , rolling
+  )
 import Statistics.Sample as Sm
 
 data SmoothingError
@@ -16,6 +21,7 @@ data SmoothingError
   | WindowTooLarge   -- ^ k > number of observations
   | InvalidAlpha     -- ^ alpha not strictly in (0, 1)
   | InsufficientData -- ^ fewer than 2 observations
+  | InvalidTimeSeries TimeSeriesError
   deriving (Show, Eq)
 
 -- * Simple Moving Average
@@ -25,18 +31,21 @@ data SmoothingError
 sma :: U.Unbox t => Int -> TimeSeries t Double -> Either SmoothingError (TimeSeries t Double)
 sma k ts = case rolling k Sm.mean ts of
   Left InvalidQuantity -> Left (if k <= 0 then WindowTooSmall else WindowTooLarge)
-  Left e               -> error ("sma: unexpected error " ++ show e)
+  Left e               -> Left (InvalidTimeSeries e)
   Right result         -> Right result
 
 -- * Single Exponential Smoothing
 
 -- | Single exponential smoothing with a manually supplied @alpha@ in @(0, 1)@.
 -- Returns the level sequence aligned to the input index.
-sesManual :: U.Unbox t => Double -> TimeSeries t Double -> Either SmoothingError (TimeSeries t Double)
+sesManual :: (Ord t, U.Unbox t) => Double -> TimeSeries t Double -> Either SmoothingError (TimeSeries t Double)
 sesManual alpha ts
+  | isNaN alpha || isInfinite alpha = Left InvalidAlpha
   | alpha <= 0 || alpha >= 1 = Left InvalidAlpha
   | n < 2                    = Left InsufficientData
-  | otherwise                = Right ts { observations = levels }
+  | otherwise                = case mkTimeSeries (index ts) levels of
+      Left err     -> Left (InvalidTimeSeries err)
+      Right result -> Right result
   where
     obs    = observations ts
     n      = U.length obs
@@ -45,7 +54,7 @@ sesManual alpha ts
 
 -- | Single exponential smoothing with @alpha@ chosen automatically by minimising
 -- one-step-ahead squared errors. Use 'sesManual' to supply @alpha@ directly.
-ses :: U.Unbox t => TimeSeries t Double -> Either SmoothingError (TimeSeries t Double)
+ses :: (Ord t, U.Unbox t) => TimeSeries t Double -> Either SmoothingError (TimeSeries t Double)
 ses ts
   | n < 2     = Left InsufficientData
   | otherwise = sesManual alphaOpt ts
@@ -53,20 +62,37 @@ ses ts
     obs      = observations ts
     n        = U.length obs
 
-    (rawSol, _path) = minimizeV NMSimplex2 tolerance maxIters simplexStep sse initialGuess
-    tolerance   = 1e-8  :: Double
-    maxIters    = 200   :: Int
-    simplexStep = fromList [0.3]
-    initialGuess = fromList [0.5]
+    alphaOpt = goldenSectionMinimize sse 1e-4 (1 - 1e-4) 1e-8 200
 
-    -- clamp to (0,1) b/c we dont want it to degen
-    alphaOpt = max 1e-4 (min (1 - 1e-4) (rawSol `atIndex` 0))
-
-    sse :: Vector Double -> Double
-    sse v = U.sum $ U.zipWith squaredError forecasts actuals
+    sse :: Double -> Double
+    sse alpha = U.sum $ U.zipWith squaredError forecasts actuals
       where
-        alpha     = v `atIndex` 0
         levels    = U.scanl' (\l y -> alpha * y + (1 - alpha) * l) (U.head obs) (U.tail obs)
         forecasts = U.take (n - 1) levels
         actuals   = U.drop 1 obs
         squaredError f a = (a - f) ^ (2 :: Int)
+
+-- | Bounded one-dimensional minimization. Golden-section search is sufficient
+-- for the SES objective and keeps smoothing free of a system GSL dependency.
+goldenSectionMinimize
+  :: (Double -> Double)
+  -> Double
+  -> Double
+  -> Double
+  -> Int
+  -> Double
+goldenSectionMinimize objective lower upper tolerance maxIterations =
+  go lower upper leftProbe rightProbe (objective leftProbe) (objective rightProbe) maxIterations
+  where
+    goldenRatio = (sqrt 5 - 1) / 2
+    leftProbe = upper - goldenRatio * (upper - lower)
+    rightProbe = lower + goldenRatio * (upper - lower)
+
+    go lo hi x1 x2 f1 f2 iterations
+      | iterations <= 0 || hi - lo <= tolerance = (lo + hi) / 2
+      | f1 <= f2 =
+          let nextX1 = hi - goldenRatio * (x2 - lo)
+          in go lo x2 nextX1 x1 (objective nextX1) f1 (iterations - 1)
+      | otherwise =
+          let nextX2 = x1 + goldenRatio * (hi - x1)
+          in go x1 hi x2 nextX2 f2 (objective nextX2) (iterations - 1)

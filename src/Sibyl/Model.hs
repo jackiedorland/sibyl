@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 
 module Sibyl.Model
   ( ModelFamily(..)
@@ -11,7 +12,6 @@ module Sibyl.Model
   , Summary(..)
   , FitError(..)
   , IC(..)
-  , RegressorMatrix(..)
   , TrainingSummary(..)
   , InformationCriteria(..)
   , ErrorMeasures(..)
@@ -19,24 +19,16 @@ module Sibyl.Model
 
 import Data.Kind (Type)
 import qualified Data.Vector.Unboxed as U
-import Sibyl.TimeSeries (TimeSeries)
-import qualified Numeric.LinearAlgebra as LinAlg
+import Sibyl.Accuracy (AccuracyError)
+import Sibyl.TimeSeries (TimeSeries, TimeSeriesError)
 
 data ModelFamily
-  = ARIMA
-  | SARIMA
-  | SARIMAX
-  | Naive
-  | ETS
-  | Theta
-  | TBATS
-  | NNETAR
-  | HoltWinters
+  = Naive
 
 data family Fitted (mdl :: ModelFamily) idx
 
 class Model (mdl :: ModelFamily) where
-  type Settings mdl :: Type
+  type Settings mdl = (settings :: Type) | settings -> mdl
   type Future   mdl :: Type
 
   fit          :: U.Unbox idx => Settings mdl -> TimeSeries idx Double -> Either FitError (Fitted mdl idx)
@@ -48,11 +40,6 @@ class Model (mdl :: ModelFamily) where
   fitted       :: Fitted mdl idx -> U.Vector Double
 
 data IC = AIC | AICc | BIC deriving (Show, Eq)
-
-data RegressorMatrix = RegressorMatrix
-  { regressorNames :: [String]
-  , regressorData  :: LinAlg.Matrix Double
-  } deriving (Show, Eq)
 
 data Prediction idx = Prediction
   { predPoint     :: TimeSeries idx Double
@@ -67,6 +54,10 @@ data FitError
   = InvalidModelSpec String
   | InsufficientData String
   | NumericalFailure String
+  | InvalidForecastHorizon Int
+  | InvalidConfidenceLevel Double
+  | InvalidTrainingData String
+  | InvalidForecastIndex TimeSeriesError
   deriving (Show, Eq)
 
 data TrainingSummary idx = TrainingSummary
@@ -88,8 +79,8 @@ data ErrorMeasures = ErrorMeasures
   { emMe   :: Double
   , emRmse :: Double
   , emMae  :: Double
-  , emMape :: Double
-  , emMase :: Double
+  , emMape :: Either AccuracyError Double
+  , emMase :: Either AccuracyError Double
   } deriving (Show, Eq)
 
 data Summary idx = Summary
@@ -129,9 +120,10 @@ instance Show (Summary idx) where
           , "  " ++ pad "ME:"   ++ show (emMe   e)
           , "  " ++ pad "RMSE:" ++ show (emRmse e)
           , "  " ++ pad "MAE:"  ++ show (emMae  e)
-          , "  " ++ pad "MAPE:" ++ show (emMape e)
-          , "  " ++ pad "MASE:" ++ show (emMase e)
+          , "  " ++ pad "MAPE:" ++ showMetric (emMape e)
+          , "  " ++ pad "MASE:" ++ showMetric (emMase e)
           ]
     ]
     where
       pad str = str ++ replicate (20 - length str) ' '
+      showMetric = either (("N/A (" ++) . (++ ")") . show) show
